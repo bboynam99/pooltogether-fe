@@ -55,7 +55,7 @@ const secret: any = web3.utils.asciiToHex('test_pool')
 const secretEncoded: any = web3.eth.abi.encodeParameter('bytes32', secret)
 const secretHash: any = web3.utils.soliditySha3(secretEncoded)
 
-const convertToDai = (val: string): number => Number(val) / 1000000000000000000
+const asDai = (val: string): number => Number(web3.utils.fromWei(val))
 
 interface ContractData {
   _isOwner: boolean
@@ -96,7 +96,7 @@ const getContractData = async (accounts: string[]): Promise<ContractData> => {
     _balance,
     _winnings,
     _poolContract,
-    _allowance: convertToDai(allowance.toString()),
+    _allowance: asDai(allowance.toString()),
     _lockDuration: res._lockDurationInBlocks.toString(),
     _openDuration: res._openDurationInBlocks.toString(),
     _pool: res._currentPool,
@@ -193,7 +193,7 @@ const App: React.FC = () => {
   const withdraw = async () => {
     if (!poolInfo) return
     try {
-      const deposited = convertToDai(String(entry.amount))
+      const deposited = asDai(String(entry.amount))
       if (deposited <= 0) return
       await poolContract.methods.withdraw().send({
         from: accounts[0],
@@ -268,19 +268,19 @@ const App: React.FC = () => {
                   </tr>
                   <tr>
                     <td><strong>Deposit:</strong></td>
-                    <td>{convertToDai(deposited.toString())} DAI</td>
+                    <td>{asDai(deposited.toString())} DAI</td>
                   </tr>
                   <tr>
                     <td><strong>Winnings:</strong></td>
-                    <td>{convertToDai(String(winnings - deposited))} DAI</td>
+                    <td>{asDai(String(winnings - deposited))} DAI</td>
                   </tr>
                   <tr>
                     <td><strong>Withdrawn:</strong></td>
-                    <td>{convertToDai(withdrawn.toString())} DAI</td>
+                    <td>{asDai(withdrawn.toString())} DAI</td>
                   </tr>
                   <tr>
                     <td><strong>Balance:</strong></td>
-                    <td>{convertToDai(String(balance))} DAI</td>
+                    <td>{asDai(String(balance))} DAI</td>
                   </tr>
                   </tbody>
                 </table>
@@ -290,7 +290,7 @@ const App: React.FC = () => {
                   <h1 style={{textAlign: 'right'}}>Winner, winner, chicken dinner!</h1>
                   <p style={{display: 'flex', alignItems: 'center', justifyContent: 'flex-end'}}>
                     <span>You won</span>
-                    <strong style={{fontSize: 38, marginLeft: 10}}>{convertToDai(String(winnings - deposited))} DAI</strong>
+                    <strong style={{fontSize: 38, marginLeft: 10}}>{asDai(String(winnings - deposited))} DAI</strong>
                   </p>
                 </div>}
                 {isComplete && isWinner && balance === 0 && <p>Your winnings have been withdrawn. Thanks for playing!</p>}
@@ -326,7 +326,7 @@ const App: React.FC = () => {
                   </tr>
                   <tr>
                     <td><strong>Total Pool Capital:</strong></td>
-                    <td>{convertToDai(poolInfo.entryTotal.toString())} DAI</td>
+                    <td>{asDai(poolInfo.entryTotal.toString())} DAI</td>
                   </tr>
                   <tr>
                     <td><strong>Lock Duration:</strong></td>
@@ -350,7 +350,7 @@ const App: React.FC = () => {
                     name = name === 'estimatedInterestFixedPoint18' ? 'estimatedInterest' : name
                     return (<tr key={name.toString()}>
                       <td><strong>{startCase(name)}:</strong></td>
-                      <td>{showWinner ? winner : convert ? `${convertToDai(value)} DAI` : value}</td>
+                      <td>{showWinner ? winner : convert ? `${asDai(value)} DAI` : value}</td>
                     </tr>)
                   })}
                   </tbody>
@@ -367,7 +367,7 @@ const App: React.FC = () => {
                     name = name === 'estimatedInterestFixedPoint18' ? 'estimatedInterest' : name
                     return (<tr key={name.toString()}>
                       <td><strong>{startCase(name)}:</strong></td>
-                      <td>{showWinner ? winner : convert ? `${convertToDai(value)} DAI` : value}</td>
+                      <td>{showWinner ? winner : convert ? `${asDai(value)} DAI` : value}</td>
                     </tr>)
                   })}
                   </tbody>
