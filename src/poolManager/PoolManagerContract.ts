@@ -3,7 +3,7 @@ import PoolManagerContractJSON from '../contracts/PoolManager.json'
 
 const poolManagerAddress = '0xBBF4ddd810690408398c47233D9c1844d8f8D4D6'
 const pmAbi: any = PoolManagerContractJSON.abi
-const poolManager = getContract(pmAbi, poolManagerAddress)
+const managerContract = getContract(pmAbi, poolManagerAddress)
 
 let instanceOfContract: any
 
@@ -16,22 +16,21 @@ export interface PoolManagerInstance {
 
 export default (account: string) => {
   if (instanceOfContract) return instanceOfContract
-  const manager = poolManager
-  const methods = {
-    createPool: poolManager.methods.createPool
-  }
-  const createPool: PoolManagerInstance['createPool'] = async callback => methods.createPool().send({
+
+  const { createPool, isOwner, getInfo } = managerContract.methods
+
+  const _createPool: PoolManagerInstance['createPool'] = async callback => createPool().send({
     from: account
   }).on('confirmation', callback)
 
-  const getInfo = () => manager.methods.getInfo().call()
+  const _getInfo = () => getInfo().call()
 
-  const isManager = (_account: string): boolean => manager.methods.isOwner().call({from: _account})
+  const isManager = (_account: string): boolean => isOwner().call({from: _account})
   
   instanceOfContract = {
-    createPool,
+    createPool: _createPool,
     isManager,
-    getInfo,
+    getInfo: _getInfo,
     methods: PoolManagerContractJSON.userdoc.methods
   }
 
