@@ -5,6 +5,7 @@ import './App.css';
 import PoolManagerContract from './contracts/PoolManager.json'
 import PoolContract from './contracts/Pool.json'
 import TokenContract from './contracts/Token.json'
+import { Contract } from 'web3-eth-contract'
 
 interface Window {
   ethereum?: any
@@ -50,12 +51,67 @@ const poolManagerAddress = '0xBBF4ddd810690408398c47233D9c1844d8f8D4D6'
 const tokenAddress = '0x3EF2b228Afb8eAf55c818ee916110D106918bC09'
 const poolManager = new web3.eth.Contract(pmAbi, poolManagerAddress)
 const tokenContract = new web3.eth.Contract(tAbi, tokenAddress)
+const secret: any = web3.utils.asciiToHex('test_pool')
+const secretEncoded: any = web3.eth.abi.encodeParameter('bytes32', secret)
+const secretHash: any = web3.utils.soliditySha3(secretEncoded)
 
 const convertToDai = (val: string): number => Number(val) / 1000000000000000000
 
+interface ContractData {
+  _isOwner: boolean
+  _poolContract: Contract
+  _winnings: number
+  _balance: number
+  _allowance: number
+  _entry: any
+  _lockDuration: number
+  _openDuration: number
+  _pool: string
+  _poolInfo: PoolInfo
+}
+
+const getContractData = async (accounts: string[]): Promise<ContractData> => {
+  const res = await poolManager.methods.getInfo().call()
+  const _poolContract = new web3.eth.Contract(pAbi, res._currentPool)
+  const _isOwner = await _poolContract.methods.isOwner().call({from: accounts[0]})
+  const _entry = await _poolContract.methods.getEntry(accounts[0]).call()
+  const allowance = await tokenContract.methods.allowance(accounts[0], res._currentPool).call()
+  const _balance = await tokenContract.methods.balanceOf(accounts[0]).call()
+  const _winnings = await _poolContract.methods.winnings(accounts[0]).call()
+  const info = pick(await _poolContract.methods.getInfo().call(), [
+    'entryTotal',
+    'startBlock',
+    'endBlock',
+    'poolState',
+    'winner',
+    'supplyBalanceTotal',
+    'ticketCost',
+    'participantCount',
+    'maxPoolSize',
+    'estimatedInterestFixedPoint18',
+    'hashOfSecret',
+  ])
+  return {
+    _isOwner,
+    _balance,
+    _winnings,
+    _poolContract,
+    _allowance: convertToDai(allowance.toString()),
+    _lockDuration: res._lockDurationInBlocks.toString(),
+    _openDuration: res._openDurationInBlocks.toString(),
+    _pool: res._currentPool,
+    _entry,
+    _poolInfo: info,
+  }
+}
+
 const App: React.FC = () => {
   const [ isOwner, setIsOwner ] = useState(false)
-  const [ allowance, setAllowance ] = useState(0)
+  const [ isWinner, setIsWinner ] = useState(false)
+  const [ balance, setBalance ] = useState()
+  const [ allowance, setAllowance ] = useState()
+  const [ deposited, setDeposited ] = useState()
+  const [ withdrawn, setWithdrawn ] = useState()
   const [ entry, setEntry ] = useState()
   const [ winnings, setWinnings ] = useState()
   const [ numTixToBuy, setNumTixToBuy ] = useState(1)
@@ -66,71 +122,69 @@ const App: React.FC = () => {
   const [ pool, setPool] = useState()
   const [ poolInfo, setPoolInfo] = useState<PoolInfo>()
 
-  const [ showPmc, setShowPmc] = useState(true)
+  const [ showPmc, setShowPmc] = useState()
   const [ showPc, setShowPc] = useState()
 
-
-
-  const init = async () => {
-    if (!accounts || !accounts.length) return
-    const res = await poolManager.methods.getInfo().call()
-    const _poolContract = new web3.eth.Contract(pAbi, res._currentPool)
-    const _isOwner = await _poolContract.methods.isOwner().call()
-    const entry = await _poolContract.methods.getEntry(accounts[0]).call()
-    const allowance = await tokenContract.methods.allowance(accounts[0], res._currentPool).call()
-    const _winnings = await _poolContract.methods.winnings(accounts[0]).call()
-    const info = pick(await _poolContract.methods.getInfo().call(), [
-      'entryTotal',
-      'startBlock',
-      'endBlock',
-      'poolState',
-      'winner',
-      'supplyBalanceTotal',
-      'ticketCost',
-      'participantCount',
-      'maxPoolSize',
-      'estimatedInterestFixedPoint18',
-      'hashOfSecret',
-    ])
-    setIsOwner(_isOwner)
-    setWinnings(_winnings - entry.amount)
-    setPoolContract(_poolContract)
-    setAllowance(convertToDai(allowance.toString()))
-    setLockDuration(res._lockDurationInBlocks.toString())
-    setOpenDuration(res._openDurationInBlocks.toString())
-    setPool(res._currentPool)
-    setEntry(entry)
-    setPoolInfo(info)
-  }
-
   useEffect(() => {
-    window.ethereum.enable().then(setAccounts)
-    window.ethereum.on('accountsChanged', setAccounts)
+    const accountsChangeHandler = async (_accounts: string[]) => {
+      const { _isOwner, _poolContract, _winnings, _allowance, _entry, _lockDuration, _openDuration, _pool, _poolInfo} = await getContractData(_accounts)
+      setAccounts(_accounts)
+      setIsWinner(_poolInfo.winner.toLowerCase() === _accounts[0].toLowerCase())
+      setBalance(_winnings - _entry.withdrawn)
+      setDeposited(_entry.amount)
+      setWithdrawn(_entry.withdrawn)
+      setIsOwner(_isOwner)
+      setWinnings(_winnings)
+      setPoolContract(_poolContract)
+      setAllowance(_allowance)
+      setLockDuration(_lockDuration)
+      setOpenDuration(_openDuration)
+      setPool(_pool)
+      setEntry(_entry)
+      setPoolInfo(_poolInfo)
+    }
+    window.ethereum.enable().then(accountsChangeHandler)
+    window.ethereum.on('accountsChanged', accountsChangeHandler)
+    return () => window.ethereum.off('accountsChanged', accountsChangeHandler)
   }, [])
 
-  useEffect(() => {
-    init()
-  }, [accounts])
+  const update = async (confirmationNum: number = 1) => {
+    if (confirmationNum > 1) return
+    const { _allowance, _entry, _isOwner, _poolInfo, _winnings} = await getContractData(accounts)
+    setIsOwner(_isOwner)
+    setIsWinner(_poolInfo.winner.toLowerCase() === accounts[0].toLowerCase())
+    setDeposited(_entry.amount)
+    setWinnings(_winnings)
+    setWithdrawn(_entry.withdrawn)
+    setBalance(_winnings - _entry.withdrawn)
+    setAllowance(_allowance)
+    setEntry(_entry)
+    setPoolInfo(_poolInfo)
+  }
 
   const connect = () => tokenContract.methods.approve(pool, web3.utils.toWei('2000', 'ether')).send({
     from: accounts[0]
-  }).on('confirmation', init)
+  }).on('confirmation', update)
 
-  const decreaseAllowance = () => tokenContract.methods.decreaseAllowance(pool, web3.utils.toWei('2000', 'ether')).send({
-    from: accounts[0]
-  }).on('confirmation', init)
+  const decreaseAllowance = () => tokenContract.methods.decreaseAllowance(pool, web3.utils.toWei('20', 'ether'))
+    .send({
+      from: accounts[0]
+    })
+    .on('confirmation', update)
 
   const buy = async () => {
     if (!poolInfo) return
     try {
       const allowance = await tokenContract.methods.allowance(accounts[0], pool).call()
       if (allowance <= 0) return
-      await poolContract.methods.buyTickets(numTixToBuy).send({
+      poolContract.methods.buyTickets(numTixToBuy)
+        .send({
         from: accounts[0],
-      }).on('confirmation', () => {
-        setNumTixToBuy(1)
-        init()
       })
+        .on('confirmation', (confirmationNumber: number) => {
+          if (confirmationNumber === 1) setNumTixToBuy(1)
+          update(confirmationNumber)
+        })
     } catch (e) {
       console.error(e)
     }
@@ -144,7 +198,7 @@ const App: React.FC = () => {
       await poolContract.methods.withdraw().send({
         from: accounts[0],
         value: 0
-      }).on('confirmation', init)
+      }).on('confirmation', update)
     } catch (e) {
       console.error(e)
     }
@@ -152,18 +206,31 @@ const App: React.FC = () => {
 
   const lock = async () => {
     if (!poolInfo || !isOwner) return
-    try {
-      await poolContract.methods.lock(poolInfo.hashOfSecret).send({
-        from: accounts[0]
-      })
-    } catch (e) {
-      console.error(e)
-    }
+    poolContract.methods.lock(secretHash).send({
+      from: accounts[0]
+    }).on('confirmation', update)
+  }
+
+  const unlock = () => {
+    if (!poolInfo || !isOwner) return
+    poolContract.methods.unlock().send({
+      from: accounts[0]
+    }).on('confirmation', update)
+  }
+
+  const complete = async () => {
+    if (!isOwner) return
+    await poolContract.methods.complete(secret).send({
+      from: accounts[0]
+    }).on('confirmation', update)
   }
 
   const pmcMethods = PoolManagerContract.userdoc.methods
   const pcMethods = PoolContract.userdoc.methods
-  
+  const isComplete = poolInfo && poolInfo.poolState === 3
+  const isOpen = poolInfo && poolInfo.poolState === 0
+  // const isWinner = poolInfo && poolInfo.winner === accounts[0]
+
   return (
     <div className="App">
       {poolInfo ? (<div>
@@ -174,55 +241,68 @@ const App: React.FC = () => {
           </div>
 
           <div className="menu cell">
-            <h4 style={{cursor: 'pointer', color: showPmc ? 'red' : ''}} onClick={() => {
-              setShowPc(false)
-              setShowPmc(!showPmc)
-            }}>Pool Manager Contract Methods</h4>
             <h4 style={{cursor: 'pointer', color: showPc ? 'red' : ''}} onClick={() => {
               setShowPmc(false)
               setShowPc(!showPc)
             }}>Pool Contract Methods</h4>
+            <h4 style={{cursor: 'pointer', color: showPmc ? 'red' : ''}} onClick={() => {
+              setShowPc(false)
+              setShowPmc(!showPmc)
+            }}>Pool Manager Contract Methods</h4>
           </div>
 
           {entry && (<div className="entry cell">
             <h2>Your Pooltogether</h2>
-            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-              <table>
-                <tbody>
-                <tr>
-                  <td><strong>Address:</strong></td>
-                  <td>{accounts[0]}</td>
-                </tr>
-                <tr>
-                  <td><strong>Deposited:</strong></td>
-                  <td>{convertToDai(String(entry.amount))} DAI</td>
-                </tr>
-                <tr>
-                  <td><strong>Tickets:</strong></td>
-                  <td>{entry.ticketCount.toNumber()}</td>
-                </tr>
-                <tr>
-                  <td><strong>Winnings:</strong></td>
-                  <td>{convertToDai(winnings)} DAI</td>
-                </tr>
-                <tr>
-                  <td><strong>Withdrawn:</strong></td>
-                  <td>{convertToDai(String(entry.withdrawn))} DAI</td>
-                </tr>
-                </tbody>
-              </table>
-              <div>
-                <div><strong>Allowance:</strong> {allowance} DAI</div>
-                {allowance <= 0 ? (<button onClick={connect}>Connect to Pool</button>) : (<div>
-                  <input type="number" min={1} value={numTixToBuy} onChange={(evt: ChangeEvent<HTMLInputElement>) => setNumTixToBuy(Number(evt.target.value))}/>
-                  <div className="actions">
 
-                    <button disabled={allowance <= 0} onClick={buy}>Buy {numTixToBuy === 1 ? 'a' : numTixToBuy} Ticket{numTixToBuy > 1 && 's'}</button>
-                    <button disabled={convertToDai(String(entry.amount)) <= 0 || poolInfo.poolState !==2} onClick={withdraw}>Withdraw</button>
-                    <button disabled={allowance < 2000} onClick={decreaseAllowance}>Decrease Allowance</button>
+            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+              <div>
+                <table>
+                  <tbody>
+                  <tr>
+                    <td><strong>Address:</strong></td>
+                    <td>{accounts[0]}</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Tickets:</strong></td>
+                    <td>{entry.ticketCount.toNumber()}</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Deposit:</strong></td>
+                    <td>{convertToDai(deposited.toString())} DAI</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Winnings:</strong></td>
+                    <td>{convertToDai(String(winnings - deposited))} DAI</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Withdrawn:</strong></td>
+                    <td>{convertToDai(withdrawn.toString())} DAI</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Balance:</strong></td>
+                    <td>{convertToDai(String(balance))} DAI</td>
+                  </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style={{minHeight: 200, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between'}}>
+                {isWinner && <div>
+                  <h1 style={{textAlign: 'right'}}>Winner, winner, chicken dinner!</h1>
+                  <p style={{display: 'flex', alignItems: 'center', justifyContent: 'flex-end'}}>
+                    <span>You won</span>
+                    <strong style={{fontSize: 38, marginLeft: 10}}>{convertToDai(String(winnings - deposited))} DAI</strong>
+                  </p>
+                </div>}
+                {isComplete && isWinner && balance === 0 && <p>Your winnings have been withdrawn. Thanks for playing!</p>}
+                {!isComplete && <div><strong>Allowance:</strong> {allowance} DAI</div>}
+                {allowance <= 0 && !isComplete ? (<button onClick={connect}>Connect to Pool</button>) : (<div>
+                  {!isComplete && <input type="number" min={1} value={numTixToBuy} onChange={(evt: ChangeEvent<HTMLInputElement>) => setNumTixToBuy(Number(evt.target.value))}/>}
+                  <div className="actions">
+                    {isComplete && balance > 0 && <button onClick={withdraw}>Withdraw</button>}
+                    {isOpen && allowance > 0 && <button onClick={buy}>Buy {numTixToBuy === 1 ? 'a' : numTixToBuy} Ticket{numTixToBuy > 1 && 's'}</button>}
+                    {!isComplete && <button onClick={decreaseAllowance}>Decrease Allowance</button>}
                   </div>
                 </div>)}
-
               </div>
             </div>
             <hr/>
@@ -238,9 +318,10 @@ const App: React.FC = () => {
                   <tr>
                     <td><strong>State:</strong></td>
                     <td>
-                      <div>{PoolState[poolInfo.poolState]}</div>
-                      {poolInfo.poolState === 0 && isOwner && <button onClick={lock}>Lock Pool</button>}
-
+                      {PoolState[poolInfo.poolState]}
+                      {poolInfo.poolState === 0 && isOwner && <button style={{marginLeft: 10}} onClick={lock}>Lock</button>}
+                      {poolInfo.poolState === 1 && isOwner && <button style={{marginLeft: 10}} onClick={unlock}>Unlock</button>}
+                      {poolInfo.poolState === 2 && isOwner && <button style={{marginLeft: 10}} onClick={complete}>Complete</button>}
                     </td>
                   </tr>
                   <tr>
@@ -297,20 +378,24 @@ const App: React.FC = () => {
 
           <div className="fns cell">
             <hr/>
-            <ul style={{display: showPmc ? 'block' : 'none' }}>
-              <h3>Pool Manager Contract Methods</h3>
-              {Object.keys(PoolManagerContract.userdoc.methods).map((name: string) => (<li key={name}>
-                <strong>{name}</strong><br/>
-                <p style={{marginLeft: 20}}>{get(pmcMethods, name).notice}</p>
-              </li>))}
-            </ul>
-            <ul style={{display: showPc ? 'block' : 'none' }}>
-              <h3>Pool Contract Methods</h3>
-              {Object.keys(PoolContract.userdoc.methods).map((name: string) => (<li key={name}>
-                <strong>{name}</strong><br/>
-                <p style={{marginLeft: 20}}>{get(pcMethods, name).notice}</p>
-              </li>))}
-            </ul>
+            <div style={{display: showPmc ? 'block' : 'none'}}>
+              <h2>Pool Manager Contract Methods</h2>
+              <ul style={{padding: 0}}>
+                {Object.keys(PoolManagerContract.userdoc.methods).map((name: string) => (<li key={name}>
+                  <strong>{name}</strong><br/>
+                  <p style={{marginLeft: 20}}>{get(pmcMethods, name).notice}</p>
+                </li>))}
+              </ul>
+            </div>
+            <div style={{display: showPc ? 'block' : 'none'}}>
+              <h2>Pool Contract Methods</h2>
+              <ul style={{padding: 0}}>
+                {Object.keys(PoolContract.userdoc.methods).map((name: string) => (<li key={name}>
+                  <strong>{name}</strong><br/>
+                  <p style={{marginLeft: 20}}>{get(pcMethods, name).notice}</p>
+                </li>))}
+              </ul>
+            </div>
           </div>
         </div>
       </div>): <div style={{margin: 20}}>Loading...</div>}

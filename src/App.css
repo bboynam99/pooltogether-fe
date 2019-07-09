@@ -14,12 +14,7 @@ li {
 .actions {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  margin-top: 20px;
-}
-
-.actions button {
-  margin-right: 20px;
+  justify-content: flex-end;
 }
 
 .header {
@@ -90,6 +85,8 @@ button {
   cursor: pointer;
   border-radius: 6px;
   padding: 8px;
+  min-width: 75px;
+  font-size: 16px;
 }
 
 input {
