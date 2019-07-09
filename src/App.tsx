@@ -1,18 +1,22 @@
-import Web3 from 'web3';
+
 import React, { ChangeEvent, useEffect, useState } from 'react'
 import { get, pick, startCase } from 'lodash'
 import './App.css';
-import PoolManagerContract from './contracts/PoolManager.json'
 import PoolContract from './contracts/Pool.json'
 import TokenContract from './contracts/Token.json'
 import { Contract } from 'web3-eth-contract'
-
-interface Window {
-  ethereum?: any
-  web3?: any
-}
-
-declare var window: Window
+import { PoolManager } from './poolManager/PoolManager'
+import PoolManagerContract, { PoolManagerInstance } from './poolManager/PoolManagerContract'
+import {
+  abiEncodeSecret,
+  asciiToHex,
+  enable,
+  fromWei,
+  getContract,
+  onAccountsChanged,
+  removeAccountsChanged,
+  soliditySha3, toWei
+} from './web3'
 
 enum PoolState {
   OPEN,
@@ -21,7 +25,7 @@ enum PoolState {
   COMPLETE
 }
 
-interface PoolInfo {
+export interface PoolInfo {
   entryTotal: number
   startBlock: number
   endBlock: number
@@ -35,29 +39,18 @@ interface PoolInfo {
   hashOfSecret: string
 }
 
-// use the given Provider, e.g in the browser with Metamask, or instantiate a new websocket provider
-let provider = 'ws://localhost:8545'
-if (typeof window.ethereum !== 'undefined'
-  || (typeof window.web3 !== 'undefined')) {
 
-  // Web3 browser user detected. You can now use the provider.
-  provider = window['ethereum'] || window.web3.currentProvider
-}
-const web3 = new Web3(provider, undefined, {})
-const pmAbi: any = PoolManagerContract.abi
 const pAbi: any = PoolContract.abi
 const tAbi: any = TokenContract.abi
-const poolManagerAddress = '0xBBF4ddd810690408398c47233D9c1844d8f8D4D6'
 const tokenAddress = '0x3EF2b228Afb8eAf55c818ee916110D106918bC09'
-const poolManager = new web3.eth.Contract(pmAbi, poolManagerAddress)
-const tokenContract = new web3.eth.Contract(tAbi, tokenAddress)
-const secret: any = web3.utils.asciiToHex('test_pool')
-const secretEncoded: any = web3.eth.abi.encodeParameter('bytes32', secret)
-const secretHash: any = web3.utils.soliditySha3(secretEncoded)
+const tokenContract = getContract(tAbi, tokenAddress)
+const secret: any = asciiToHex('test_pool')
+const secretHash: string = soliditySha3(abiEncodeSecret(secret))
 
-const asDai = (val: string): number => Number(web3.utils.fromWei(val))
+const asDai = (val: string): number => Number(fromWei(val))
 
 interface ContractData {
+  _manager: PoolManagerInstance
   _isPoolManager: boolean
   _isPoolOwner: boolean
   _poolContract: Contract
@@ -73,9 +66,10 @@ interface ContractData {
 }
 
 const getContractData = async (accounts: string[]): Promise<ContractData> => {
-  const _poolManagerInfo = await poolManager.methods.getInfo().call()
-  const _poolContract = new web3.eth.Contract(pAbi, _poolManagerInfo._currentPool)
-  const _isPoolManager = await poolManager.methods.isOwner().call({from: accounts[0]})
+  const manager = PoolManagerContract(accounts[0])
+  const _poolManagerInfo = await manager.getInfo()
+  const _poolContract = getContract(pAbi, _poolManagerInfo._currentPool)
+  const _isPoolManager = await manager.isManager(accounts[0])
   const _isPoolOwner = await _poolContract.methods.isOwner().call({from: accounts[0]})
   const _entry = await _poolContract.methods.getEntry(accounts[0]).call()
   const allowance = await tokenContract.methods.allowance(accounts[0], _poolManagerInfo._currentPool).call()
@@ -95,6 +89,7 @@ const getContractData = async (accounts: string[]): Promise<ContractData> => {
     'hashOfSecret',
   ])
   return {
+    _manager: manager,
     _isPoolManager,
     _isPoolOwner,
     _balance,
@@ -111,6 +106,7 @@ const getContractData = async (accounts: string[]): Promise<ContractData> => {
 }
 
 const App: React.FC = () => {
+  const [ manager, setManager ] = useState<PoolManagerInstance>()
   const [ isPoolManager, setIsPoolManager ] = useState(false)
   const [ isPoolOwner, setIsPoolOwner ] = useState(false)
   const [ isWinner, setIsWinner ] = useState(false)
@@ -134,8 +130,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const accountsChangeHandler = async (_accounts: string[]) => {
-      const { _isPoolManager, _isPoolOwner, _poolContract, _winnings, _allowance, _entry, _lockDuration, _openDuration, _pool, _poolInfo, _poolManagerInfo} = await getContractData(_accounts)
+      const { _isPoolManager, _isPoolOwner, _manager, _poolContract, _winnings, _allowance, _entry, _lockDuration, _openDuration, _pool, _poolInfo, _poolManagerInfo} = await getContractData(_accounts)
       setAccounts(_accounts)
+      setManager(_manager)
       setIsPoolManager(_isPoolManager)
       setIsPoolOwner(_isPoolOwner)
       setPoolInfo(_poolInfo)
@@ -152,14 +149,15 @@ const App: React.FC = () => {
       setPool(_pool)
       setEntry(_entry)
     }
-    window.ethereum.enable().then(accountsChangeHandler)
-    window.ethereum.on('accountsChanged', accountsChangeHandler)
-    return () => window.ethereum.off('accountsChanged', accountsChangeHandler)
+    enable().then(accountsChangeHandler)
+    onAccountsChanged(accountsChangeHandler)
+    return () => removeAccountsChanged(accountsChangeHandler)
   }, [])
 
   const update = async (confirmationNum: number = 1) => {
     if (confirmationNum > 1) return
-    const { _allowance, _entry, _isPoolManager, _isPoolOwner, _poolInfo, _poolManagerInfo, _winnings} = await getContractData(accounts)
+    const { _allowance, _entry, _isPoolManager, _isPoolOwner, _manager, _poolInfo, _poolManagerInfo, _winnings} = await getContractData(accounts)
+    setManager(_manager)
     setIsPoolManager(_isPoolManager)
     setIsPoolOwner(_isPoolOwner)
     setPoolManagerInfo(_poolManagerInfo)
@@ -173,11 +171,11 @@ const App: React.FC = () => {
     setEntry(_entry)
   }
 
-  const connect = () => tokenContract.methods.approve(pool, web3.utils.toWei('2000', 'ether')).send({
+  const connect = () => tokenContract.methods.approve(pool, toWei('2000')).send({
     from: accounts[0]
   }).on('confirmation', update)
 
-  const decreaseAllowance = () => tokenContract.methods.decreaseAllowance(pool, web3.utils.toWei('20', 'ether'))
+  const decreaseAllowance = () => tokenContract.methods.decreaseAllowance(pool, toWei('20'))
     .send({
       from: accounts[0]
     })
@@ -217,12 +215,7 @@ const App: React.FC = () => {
   /**
    * Pool Manager Methods
    */
-  const createPool = async () => {
-    if (!poolInfo || !isPoolOwner) return
-    poolManager.methods.createPool().send({
-      from: accounts[0]
-    }).on('confirmation', update)
-  }
+
 
 
   /**
@@ -249,13 +242,13 @@ const App: React.FC = () => {
     }).on('confirmation', update)
   }
 
+  if (!manager) return null
+
   ////////////////////////////////////////////////////////////////////////////////////////
 
-  const pmcMethods = PoolManagerContract.userdoc.methods
   const pcMethods = PoolContract.userdoc.methods
   const isComplete = poolInfo && poolInfo.poolState === 3
   const isOpen = poolInfo && poolInfo.poolState === 0
-  // const isWinner = poolInfo && poolInfo.winner === accounts[0]
 
   return (
     <div className="App">
@@ -276,26 +269,8 @@ const App: React.FC = () => {
               setShowPmc(!showPmc)
             }}>Pool Manager Contract Methods</h4>
             <hr/>
-            {isPoolManager && <div>
-              <h2>Pool Management</h2>
-              <div style={{textAlign: 'center', marginTop: 10, marginBottom: 20}}><button disabled={!isComplete} onClick={createPool} style={{width: '100%'}}>Create Pool</button></div>
+            {isPoolManager && <PoolManager accounts={accounts[0]} currentPoolComplete={!!isComplete} onConfirmation={update} poolManagerInfo={poolManagerInfo}/>}
 
-              <table>
-                <caption style={{textAlign: 'left'}}><strong>Pool Creation Variables</strong></caption>
-                <tbody>
-                <tr>
-                  <td><strong>Lock Duration:</strong></td>
-                  <td>{lockDuration} blocks</td>
-                </tr>
-                <tr>
-                  <td><strong>Open Duration:</strong></td>
-                  <td>{openDuration} blocks</td>
-                </tr>
-                </tbody>
-              </table>
-
-              <hr/>
-            </div>}
             <h4>Previous Pools</h4>
           </div>
 
@@ -420,9 +395,9 @@ const App: React.FC = () => {
             <div style={{display: showPmc ? 'block' : 'none'}}>
               <h2>Pool Manager Contract Methods</h2>
               <ul style={{padding: 0}}>
-                {Object.keys(PoolManagerContract.userdoc.methods).map((name: string) => (<li key={name}>
+                {Object.keys(manager.methods).map((name: string) => (<li key={name}>
                   <strong>{name}</strong><br/>
-                  <p style={{marginLeft: 20}}>{get(pmcMethods, name).notice}</p>
+                  <p style={{marginLeft: 20}}>{get(manager.methods, name).notice}</p>
                 </li>))}
               </ul>
             </div>
