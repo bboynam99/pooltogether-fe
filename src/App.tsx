@@ -58,7 +58,8 @@ const secretHash: any = web3.utils.soliditySha3(secretEncoded)
 const asDai = (val: string): number => Number(web3.utils.fromWei(val))
 
 interface ContractData {
-  _isOwner: boolean
+  _isPoolManager: boolean
+  _isPoolOwner: boolean
   _poolContract: Contract
   _winnings: number
   _balance: number
@@ -67,18 +68,20 @@ interface ContractData {
   _lockDuration: number
   _openDuration: number
   _pool: string
+  _poolManagerInfo: any
   _poolInfo: PoolInfo
 }
 
 const getContractData = async (accounts: string[]): Promise<ContractData> => {
-  const res = await poolManager.methods.getInfo().call()
-  const _poolContract = new web3.eth.Contract(pAbi, res._currentPool)
-  const _isOwner = await _poolContract.methods.isOwner().call({from: accounts[0]})
+  const _poolManagerInfo = await poolManager.methods.getInfo().call()
+  const _poolContract = new web3.eth.Contract(pAbi, _poolManagerInfo._currentPool)
+  const _isPoolManager = await poolManager.methods.isOwner().call({from: accounts[0]})
+  const _isPoolOwner = await _poolContract.methods.isOwner().call({from: accounts[0]})
   const _entry = await _poolContract.methods.getEntry(accounts[0]).call()
-  const allowance = await tokenContract.methods.allowance(accounts[0], res._currentPool).call()
+  const allowance = await tokenContract.methods.allowance(accounts[0], _poolManagerInfo._currentPool).call()
   const _balance = await tokenContract.methods.balanceOf(accounts[0]).call()
   const _winnings = await _poolContract.methods.winnings(accounts[0]).call()
-  const info = pick(await _poolContract.methods.getInfo().call(), [
+  const _poolInfo = pick(await _poolContract.methods.getInfo().call(), [
     'entryTotal',
     'startBlock',
     'endBlock',
@@ -92,21 +95,24 @@ const getContractData = async (accounts: string[]): Promise<ContractData> => {
     'hashOfSecret',
   ])
   return {
-    _isOwner,
+    _isPoolManager,
+    _isPoolOwner,
     _balance,
     _winnings,
     _poolContract,
     _allowance: asDai(allowance.toString()),
-    _lockDuration: res._lockDurationInBlocks.toString(),
-    _openDuration: res._openDurationInBlocks.toString(),
-    _pool: res._currentPool,
+    _lockDuration: _poolManagerInfo._lockDurationInBlocks.toString(),
+    _openDuration: _poolManagerInfo._openDurationInBlocks.toString(),
+    _pool: _poolManagerInfo._currentPool,
     _entry,
-    _poolInfo: info,
+    _poolManagerInfo,
+    _poolInfo,
   }
 }
 
 const App: React.FC = () => {
-  const [ isOwner, setIsOwner ] = useState(false)
+  const [ isPoolManager, setIsPoolManager ] = useState(false)
+  const [ isPoolOwner, setIsPoolOwner ] = useState(false)
   const [ isWinner, setIsWinner ] = useState(false)
   const [ balance, setBalance ] = useState()
   const [ allowance, setAllowance ] = useState()
@@ -121,19 +127,23 @@ const App: React.FC = () => {
   const [ openDuration, setOpenDuration] = useState(0)
   const [ pool, setPool] = useState()
   const [ poolInfo, setPoolInfo] = useState<PoolInfo>()
+  const [ poolManagerInfo, setPoolManagerInfo] = useState<any>()
 
   const [ showPmc, setShowPmc] = useState()
   const [ showPc, setShowPc] = useState()
 
   useEffect(() => {
     const accountsChangeHandler = async (_accounts: string[]) => {
-      const { _isOwner, _poolContract, _winnings, _allowance, _entry, _lockDuration, _openDuration, _pool, _poolInfo} = await getContractData(_accounts)
+      const { _isPoolManager, _isPoolOwner, _poolContract, _winnings, _allowance, _entry, _lockDuration, _openDuration, _pool, _poolInfo, _poolManagerInfo} = await getContractData(_accounts)
       setAccounts(_accounts)
+      setIsPoolManager(_isPoolManager)
+      setIsPoolOwner(_isPoolOwner)
+      setPoolInfo(_poolInfo)
+      setPoolManagerInfo(_poolManagerInfo)
       setIsWinner(_poolInfo.winner.toLowerCase() === _accounts[0].toLowerCase())
       setBalance(_winnings - _entry.withdrawn)
       setDeposited(_entry.amount)
       setWithdrawn(_entry.withdrawn)
-      setIsOwner(_isOwner)
       setWinnings(_winnings)
       setPoolContract(_poolContract)
       setAllowance(_allowance)
@@ -141,7 +151,6 @@ const App: React.FC = () => {
       setOpenDuration(_openDuration)
       setPool(_pool)
       setEntry(_entry)
-      setPoolInfo(_poolInfo)
     }
     window.ethereum.enable().then(accountsChangeHandler)
     window.ethereum.on('accountsChanged', accountsChangeHandler)
@@ -150,8 +159,11 @@ const App: React.FC = () => {
 
   const update = async (confirmationNum: number = 1) => {
     if (confirmationNum > 1) return
-    const { _allowance, _entry, _isOwner, _poolInfo, _winnings} = await getContractData(accounts)
-    setIsOwner(_isOwner)
+    const { _allowance, _entry, _isPoolManager, _isPoolOwner, _poolInfo, _poolManagerInfo, _winnings} = await getContractData(accounts)
+    setIsPoolManager(_isPoolManager)
+    setIsPoolOwner(_isPoolOwner)
+    setPoolManagerInfo(_poolManagerInfo)
+    setPoolInfo(_poolInfo)
     setIsWinner(_poolInfo.winner.toLowerCase() === accounts[0].toLowerCase())
     setDeposited(_entry.amount)
     setWinnings(_winnings)
@@ -159,7 +171,6 @@ const App: React.FC = () => {
     setBalance(_winnings - _entry.withdrawn)
     setAllowance(_allowance)
     setEntry(_entry)
-    setPoolInfo(_poolInfo)
   }
 
   const connect = () => tokenContract.methods.approve(pool, web3.utils.toWei('2000', 'ether')).send({
@@ -193,7 +204,6 @@ const App: React.FC = () => {
   const withdraw = async () => {
     if (!poolInfo) return
     try {
-      const deposited = asDai(String(entry.amount))
       if (deposited <= 0) return
       await poolContract.methods.withdraw().send({
         from: accounts[0],
@@ -204,26 +214,42 @@ const App: React.FC = () => {
     }
   }
 
+  /**
+   * Pool Manager Methods
+   */
+  const createPool = async () => {
+    if (!poolInfo || !isPoolOwner) return
+    poolManager.methods.createPool().send({
+      from: accounts[0]
+    }).on('confirmation', update)
+  }
+
+
+  /**
+   * Pool Methods
+   */
   const lock = async () => {
-    if (!poolInfo || !isOwner) return
+    if (!poolInfo || !isPoolOwner) return
     poolContract.methods.lock(secretHash).send({
       from: accounts[0]
     }).on('confirmation', update)
   }
 
   const unlock = () => {
-    if (!poolInfo || !isOwner) return
+    if (!poolInfo || !isPoolOwner) return
     poolContract.methods.unlock().send({
       from: accounts[0]
     }).on('confirmation', update)
   }
 
   const complete = async () => {
-    if (!isOwner) return
+    if (!isPoolOwner) return
     await poolContract.methods.complete(secret).send({
       from: accounts[0]
     }).on('confirmation', update)
   }
+
+  ////////////////////////////////////////////////////////////////////////////////////////
 
   const pmcMethods = PoolManagerContract.userdoc.methods
   const pcMethods = PoolContract.userdoc.methods
@@ -249,6 +275,28 @@ const App: React.FC = () => {
               setShowPc(false)
               setShowPmc(!showPmc)
             }}>Pool Manager Contract Methods</h4>
+            <hr/>
+            {isPoolManager && <div>
+              <h2>Pool Management</h2>
+              <div style={{textAlign: 'center', marginTop: 10, marginBottom: 20}}><button disabled={!isComplete} onClick={createPool} style={{width: '100%'}}>Create Pool</button></div>
+
+              <table>
+                <caption style={{textAlign: 'left'}}><strong>Pool Creation Variables</strong></caption>
+                <tbody>
+                <tr>
+                  <td><strong>Lock Duration:</strong></td>
+                  <td>{lockDuration} blocks</td>
+                </tr>
+                <tr>
+                  <td><strong>Open Duration:</strong></td>
+                  <td>{openDuration} blocks</td>
+                </tr>
+                </tbody>
+              </table>
+
+              <hr/>
+            </div>}
+            <h4>Previous Pools</h4>
           </div>
 
           {entry && (<div className="entry cell">
@@ -309,7 +357,10 @@ const App: React.FC = () => {
           </div>)}
 
           <div className="poolInfo cell">
-            <h2>Current Pool Info</h2>
+            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+              <h2 style={{marginTop: 0, marginBottom: 0}}>Current Pool Info</h2>
+              <span><strong>Total Pool Capital:</strong> {asDai(poolInfo.entryTotal.toString())} DAI</span>
+            </div>
             <h4>Address: {pool}</h4>
             <div className="pool-grid-container">
               {pool && (<div className="pool-info-1">
@@ -319,22 +370,10 @@ const App: React.FC = () => {
                     <td><strong>State:</strong></td>
                     <td>
                       {PoolState[poolInfo.poolState]}
-                      {poolInfo.poolState === 0 && isOwner && <button style={{marginLeft: 10}} onClick={lock}>Lock</button>}
-                      {poolInfo.poolState === 1 && isOwner && <button style={{marginLeft: 10}} onClick={unlock}>Unlock</button>}
-                      {poolInfo.poolState === 2 && isOwner && <button style={{marginLeft: 10}} onClick={complete}>Complete</button>}
+                      {poolInfo.poolState === 0 && isPoolOwner && <button style={{marginLeft: 10}} onClick={lock}>Lock</button>}
+                      {poolInfo.poolState === 1 && isPoolOwner && <button style={{marginLeft: 10}} onClick={unlock}>Unlock</button>}
+                      {poolInfo.poolState === 2 && isPoolOwner && <button style={{marginLeft: 10}} onClick={complete}>Complete</button>}
                     </td>
-                  </tr>
-                  <tr>
-                    <td><strong>Total Pool Capital:</strong></td>
-                    <td>{asDai(poolInfo.entryTotal.toString())} DAI</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Lock Duration:</strong></td>
-                    <td>{lockDuration} blocks</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Open Duration:</strong></td>
-                    <td>{openDuration} blocks</td>
                   </tr>
                   </tbody>
                 </table>
