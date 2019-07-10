@@ -2,7 +2,7 @@ import { abiEncodeSecret, asciiToHex, getContract, soliditySha3 } from '../web3'
 import { pick} from 'lodash'
 import PoolContractJSON from '../contracts/Pool.json'
 
-enum PoolState {
+export enum PoolState {
   OPEN,
   LOCKED,
   UNLOCKED,
@@ -24,29 +24,30 @@ export interface PoolInfo {
 }
 
 export interface PoolInstance {
-  buyTickets: (numTix: number, account: string, callback: () => void) => void
-  complete: (account: string, secret: string, callback: () => void) => any
-  poolInfo: PoolInfo
-  isOwner: (address: string) => any
-  lock: (callback: () => void) => any
-  unlock: (callback: () => void) => any
-  withdraw: (account: string, callback: () => void) => any
+  buyTickets: (numTix: number, account: string, callback: (confirmationNumber: number) => void) => Promise<void>
+  complete: (address: string, secret: string, callback: () => void) => Promise<void>
+  getEntry: (account: string) => Promise<any>
+  getInfo: () => Promise<PoolInfo>
+  isOwner: (address: string) => Promise<boolean>
+  lock: (address: string, secretHash: string, callback: () => void) => Promise<void>
+  unlock: (address: string, callback: () => void) => Promise<void>
+  winnings: (account: string) => Promise<number>
+  withdraw: (account: string, callback: () => void) => Promise<void>
   methodDocs: {[key: string]: {notice: string} | string}
 }
 
 const pAbi: any = PoolContractJSON.abi
 let instanceOfContract: PoolInstance
 
-export default async (owner: string, _secret: string): Promise<PoolInstance> => {
+export default (owner: string): PoolInstance => {
   if (instanceOfContract) return instanceOfContract
 
   const poolContract = getContract(pAbi, owner)
-  const { buyTickets, complete, getInfo, isOwner, lock, unlock, withdraw } = poolContract.methods
-  const secret: any = asciiToHex(_secret)
-  const secretHash: string = soliditySha3(abiEncodeSecret(secret))
+  const { buyTickets, complete, getEntry, getInfo, isOwner, lock, unlock, winnings, withdraw } = poolContract.methods
+
   const _methodDocs = PoolContractJSON.userdoc.methods
 
-  const _buyTickets = (numTix: number, account: string, callback: () => void) => buyTickets(numTix).send({
+  const _buyTickets = (numTix: number, account: string, callback: (confirmationNumber: number) => void) => buyTickets(numTix).send({
     from: account,
   }).on('confirmation', callback)
 
@@ -54,13 +55,9 @@ export default async (owner: string, _secret: string): Promise<PoolInstance> => 
     from: account
   }).on('confirmation', callback)
 
-  const _isOwner = (address: string): boolean => isOwner().call({from: address})
+  const _getEntry = (account: string) => getEntry(account).call()
 
-  const _lock = (callback: () => void) => lock(secretHash).send({
-    from: owner
-  }).on('confirmation', callback)
-
-  const _poolInfo = pick(await getInfo().call(), [
+  const _getInfo = getInfo().call().then((info: PoolInfo) => pick(info, [
     'entryTotal',
     'startBlock',
     'endBlock',
@@ -72,11 +69,19 @@ export default async (owner: string, _secret: string): Promise<PoolInstance> => 
     'maxPoolSize',
     'estimatedInterestFixedPoint18',
     'hashOfSecret',
-  ])
+  ]))
 
-  const _unlock = (callback: () => void) => unlock().send({
-    from: owner
+  const _isOwner = (address: string) => isOwner().call({from: address})
+
+  const _lock = (address: string, secretHash: string, callback: () => void) => lock(secretHash).send({
+    from: address
   }).on('confirmation', callback)
+
+  const _unlock = (address: string, callback: () => void) => unlock().send({
+    from: address
+  }).on('confirmation', callback)
+
+  const _winnings = (address: string) => winnings(address).call()
 
   const _withdraw = (account: string, callback: () => void) => withdraw().send({
     from: account,
@@ -86,11 +91,13 @@ export default async (owner: string, _secret: string): Promise<PoolInstance> => 
   instanceOfContract = {
     buyTickets: _buyTickets,
     complete: _complete,
+    getEntry: _getEntry,
+    getInfo: _getInfo,
     isOwner: _isOwner,
     lock: _lock,
     methodDocs: _methodDocs,
-    poolInfo: _poolInfo,
     unlock: _unlock,
+    winnings: _winnings,
     withdraw: _withdraw,
   }
 

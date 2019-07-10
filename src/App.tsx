@@ -2,11 +2,11 @@
 import React, { ChangeEvent, useEffect, useState } from 'react'
 import { get, pick, startCase } from 'lodash'
 import './App.css';
-import PoolContract from './contracts/Pool.json'
-import TokenContract from './contracts/Token.json'
 import { Contract } from 'web3-eth-contract'
+import PoolContract, { PoolInfo, PoolInstance, PoolState } from './pool/PoolContract'
 import { PoolManager } from './poolManager/PoolManager'
 import PoolManagerContract, { PoolManagerInstance } from './poolManager/PoolManagerContract'
+import TokenContract, { TokenInstance } from './token/TokenContract'
 import {
   abiEncodeSecret,
   asciiToHex,
@@ -18,15 +18,22 @@ import {
   soliditySha3, toWei
 } from './web3'
 
+const contractOwner = {
+  address: '0x8f7f92e0660dd92eca1fad5f285c4dca556e433e',
+  privateKey: '0xab7873cc1c85a753f5e23eb3c7fc6c3c5b475304501a41855b4a437b38bf1396'
+}
 
+const secret: any = asciiToHex('test_pool')
+const secretHash: string = soliditySha3(abiEncodeSecret(secret))
 
 const asDai = (val: string): number => Number(fromWei(val))
 
 interface ContractData {
-  _manager: PoolManagerInstance
   _isPoolManager: boolean
   _isPoolOwner: boolean
-  _poolContract: Contract
+  _poolContract: PoolInstance
+  _poolManagerContract: PoolManagerInstance
+  _tokenContract: TokenInstance
   _winnings: number
   _balance: number
   _allowance: number
@@ -39,35 +46,33 @@ interface ContractData {
 }
 
 const getContractData = async (accounts: string[]): Promise<ContractData> => {
-  const manager = PoolManagerContract(accounts[0])
-  const _poolManagerInfo = await manager.getInfo()
-  const _poolContract = getContract(pAbi, _poolManagerInfo._currentPool)
-  const _isPoolManager = await manager.isManager(accounts[0])
+  const _account = accounts.length ? accounts[0] : ''
 
-  const _entry = await _poolContract.methods.getEntry(accounts[0]).call()
-  const allowance = await tokenContract.methods.allowance(accounts[0], _poolManagerInfo._currentPool).call()
-  const _balance = await tokenContract.methods.balanceOf(accounts[0]).call()
-  const _winnings = await _poolContract.methods.winnings(accounts[0]).call()
-  const _poolInfo = pick(await _poolContract.methods.getInfo().call(), [
-    'entryTotal',
-    'startBlock',
-    'endBlock',
-    'poolState',
-    'winner',
-    'supplyBalanceTotal',
-    'ticketCost',
-    'participantCount',
-    'maxPoolSize',
-    'estimatedInterestFixedPoint18',
-    'hashOfSecret',
-  ])
+  // Pool Manager
+  const _poolManagerContract = PoolManagerContract(contractOwner.address)
+  const _poolManagerInfo = await _poolManagerContract.getInfo()
+  const _isPoolManager = await _poolManagerContract.isManager(_account)
+
+  // Current Pool
+  const _poolContract = PoolContract(contractOwner.address)
+  const _poolInfo = await _poolContract.getInfo()
+  const _isPoolOwner = await _poolContract.isOwner(_account)
+  const _entry = await _poolContract.getEntry(_account)
+  const _winnings = await _poolContract.winnings(_account)
+
+  // Token
+  const _tokenContract = TokenContract()
+  const allowance = await _tokenContract.allowance(_account, _poolManagerInfo._currentPool)
+  const _balance = await _tokenContract.balanceOf(_account)
+
   return {
-    _manager: manager,
+    _poolContract,
+    _poolManagerContract,
+    _tokenContract,
     _isPoolManager,
     _isPoolOwner,
     _balance,
     _winnings,
-    _poolContract,
     _allowance: asDai(allowance.toString()),
     _lockDuration: _poolManagerInfo._lockDurationInBlocks.toString(),
     _openDuration: _poolManagerInfo._openDurationInBlocks.toString(),
@@ -79,7 +84,11 @@ const getContractData = async (accounts: string[]): Promise<ContractData> => {
 }
 
 const App: React.FC = () => {
-  const [ manager, setManager ] = useState<PoolManagerInstance>()
+  // contracts
+  const [ poolContract, setPoolContract ] = useState<PoolInstance>()
+  const [ poolManagerContract, setPoolManagerContract ] = useState<PoolManagerInstance>()
+  const [ tokenContract, setTokenContract ] = useState<TokenInstance>()
+
   const [ isPoolManager, setIsPoolManager ] = useState(false)
   const [ isPoolOwner, setIsPoolOwner ] = useState(false)
   const [ isWinner, setIsWinner ] = useState(false)
@@ -91,7 +100,6 @@ const App: React.FC = () => {
   const [ winnings, setWinnings ] = useState()
   const [ numTixToBuy, setNumTixToBuy ] = useState(1)
   const [ accounts, setAccounts ] = useState()
-  const [ poolContract, setPoolContract ] = useState()
   const [ lockDuration, setLockDuration] = useState(0)
   const [ openDuration, setOpenDuration] = useState(0)
   const [ pool, setPool] = useState()
@@ -103,23 +111,28 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const accountsChangeHandler = async (_accounts: string[]) => {
-      const { _isPoolManager, _isPoolOwner, _manager, _poolContract, _winnings, _allowance, _entry, _lockDuration, _openDuration, _pool, _poolInfo, _poolManagerInfo} = await getContractData(_accounts)
+      const { _isPoolManager, _isPoolOwner, _poolManagerContract, _poolContract, _tokenContract, _winnings, _allowance, _entry, _lockDuration, _openDuration, _pool, _poolInfo, _poolManagerInfo} = await getContractData(_accounts)
       setAccounts(_accounts)
-      setManager(_manager)
+
+      setPoolManagerContract(_poolManagerContract)
+      setPoolContract(_poolContract)
+      setTokenContract(_tokenContract)
+
       setIsPoolManager(_isPoolManager)
       setIsPoolOwner(_isPoolOwner)
-      setPoolInfo(_poolInfo)
       setPoolManagerInfo(_poolManagerInfo)
+
+      setPool(_pool)
+      setPoolInfo(_poolInfo)
+
       setIsWinner(_poolInfo.winner.toLowerCase() === _accounts[0].toLowerCase())
       setBalance(_winnings - _entry.withdrawn)
       setDeposited(_entry.amount)
       setWithdrawn(_entry.withdrawn)
       setWinnings(_winnings)
-      setPoolContract(_poolContract)
       setAllowance(_allowance)
       setLockDuration(_lockDuration)
       setOpenDuration(_openDuration)
-      setPool(_pool)
       setEntry(_entry)
     }
     enable().then(accountsChangeHandler)
@@ -129,12 +142,17 @@ const App: React.FC = () => {
 
   const update = async (confirmationNum: number = 1) => {
     if (confirmationNum > 1) return
-    const { _allowance, _entry, _isPoolManager, _isPoolOwner, _manager, _poolInfo, _poolManagerInfo, _winnings} = await getContractData(accounts)
-    setManager(_manager)
+    const { _allowance, _entry, _isPoolManager, _isPoolOwner, _poolContract, _poolManagerContract, _poolInfo, _poolManagerInfo, _tokenContract, _winnings} = await getContractData(accounts)
+    setPoolManagerContract(_poolManagerContract)
+    setPoolContract(_poolContract)
+    setTokenContract(_tokenContract)
+
     setIsPoolManager(_isPoolManager)
-    setIsPoolOwner(_isPoolOwner)
     setPoolManagerInfo(_poolManagerInfo)
+
+    setIsPoolOwner(_isPoolOwner)
     setPoolInfo(_poolInfo)
+
     setIsWinner(_poolInfo.winner.toLowerCase() === accounts[0].toLowerCase())
     setDeposited(_entry.amount)
     setWinnings(_winnings)
@@ -144,53 +162,33 @@ const App: React.FC = () => {
     setEntry(_entry)
   }
 
+  if (!poolManagerContract || !poolContract || !tokenContract) return null
+
+  const connect = () => tokenContract.approve(accounts[0], pool, update)
+
+  const decreaseAllowance = () => tokenContract.decreaseAllowance(pool, accounts[0], update)
+
   const buy = async () => {
-    if (!poolInfo) return
-    try {
-      const allowance = await tokenContract.methods.allowance(accounts[0], pool).call()
-      if (allowance <= 0) return
-      poolContract.methods.buyTickets(numTixToBuy)
-        .send({
-        from: accounts[0],
-      })
-        .on('confirmation', (confirmationNumber: number) => {
-          if (confirmationNumber === 1) setNumTixToBuy(1)
-          update(confirmationNumber)
-        })
-    } catch (e) {
-      console.error(e)
-    }
+    if (!poolContract || allowance <= 0) return
+    poolContract.buyTickets(numTixToBuy, accounts[0], (confirmationNumber: number) => {
+      if (confirmationNumber === 1) setNumTixToBuy(1)
+      update(confirmationNumber)
+    })
   }
 
-  const withdraw = async () => {
-    if (!poolInfo) return
-    try {
-      if (deposited <= 0) return
-      await poolContract.methods.withdraw().send({
-        from: accounts[0],
-        value: 0
-      }).on('confirmation', update)
-    } catch (e) {
-      console.error(e)
-    }
-  }
+  const withdraw = () => poolContract && deposited > 0 && poolContract.withdraw(accounts[0], update)
 
-  /**
-   * Pool Manager Methods
-   */
+  const lock = () => poolInfo && isPoolOwner && poolContract.lock(accounts[0], secretHash, update)
 
+  const unlock = () => poolInfo && isPoolOwner && poolContract.unlock(accounts[0], update)
 
+  const complete = () => poolInfo && isPoolOwner && poolContract.complete(accounts[0], secret, update)
 
-  /**
-   * Pool Methods
-   */
-  }
-
-  if (!manager) return null
+  const methodDescription = (value: {notice: string} | string) => typeof value === 'string' ? value : value.notice
 
   ////////////////////////////////////////////////////////////////////////////////////////
 
-  const pcMethods = PoolContract.userdoc.methods
+  const pcMethods = poolContract.methodDocs
   const isComplete = poolInfo && poolInfo.poolState === 3
   const isOpen = poolInfo && poolInfo.poolState === 0
 
@@ -343,18 +341,18 @@ const App: React.FC = () => {
             <div style={{display: showPmc ? 'block' : 'none'}}>
               <h2>Pool Manager Contract Methods</h2>
               <ul style={{padding: 0}}>
-                {Object.keys(manager.methods).map((name: string) => (<li key={name}>
+                {Object.keys(poolManagerContract.methodDocs).map((name: string) => (<li key={name}>
                   <strong>{name}</strong><br/>
-                  <p style={{marginLeft: 20}}>{get(manager.methods, name).notice}</p>
+                  <p style={{marginLeft: 20}}>{methodDescription(poolManagerContract.methodDocs[name])}</p>
                 </li>))}
               </ul>
             </div>
             <div style={{display: showPc ? 'block' : 'none'}}>
               <h2>Pool Contract Methods</h2>
               <ul style={{padding: 0}}>
-                {Object.keys(PoolContract.userdoc.methods).map((name: string) => (<li key={name}>
+                {Object.keys(poolContract.methodDocs).map((name: string) => (<li key={name}>
                   <strong>{name}</strong><br/>
-                  <p style={{marginLeft: 20}}>{get(pcMethods, name).notice}</p>
+                  <p style={{marginLeft: 20}}>{methodDescription(poolContract.methodDocs[name])}</p>
                 </li>))}
               </ul>
             </div>
