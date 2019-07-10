@@ -18,34 +18,7 @@ import {
   soliditySha3, toWei
 } from './web3'
 
-enum PoolState {
-  OPEN,
-  LOCKED,
-  UNLOCKED,
-  COMPLETE
-}
 
-export interface PoolInfo {
-  entryTotal: number
-  startBlock: number
-  endBlock: number
-  poolState: PoolState
-  winner: string
-  supplyBalanceTotal: number
-  ticketCost: number
-  participantCount: number
-  maxPoolSize: number
-  estimatedInterestFixedPoint18: number
-  hashOfSecret: string
-}
-
-
-const pAbi: any = PoolContract.abi
-const tAbi: any = TokenContract.abi
-const tokenAddress = '0x3EF2b228Afb8eAf55c818ee916110D106918bC09'
-const tokenContract = getContract(tAbi, tokenAddress)
-const secret: any = asciiToHex('test_pool')
-const secretHash: string = soliditySha3(abiEncodeSecret(secret))
 
 const asDai = (val: string): number => Number(fromWei(val))
 
@@ -70,7 +43,7 @@ const getContractData = async (accounts: string[]): Promise<ContractData> => {
   const _poolManagerInfo = await manager.getInfo()
   const _poolContract = getContract(pAbi, _poolManagerInfo._currentPool)
   const _isPoolManager = await manager.isManager(accounts[0])
-  const _isPoolOwner = await _poolContract.methods.isOwner().call({from: accounts[0]})
+
   const _entry = await _poolContract.methods.getEntry(accounts[0]).call()
   const allowance = await tokenContract.methods.allowance(accounts[0], _poolManagerInfo._currentPool).call()
   const _balance = await tokenContract.methods.balanceOf(accounts[0]).call()
@@ -171,16 +144,6 @@ const App: React.FC = () => {
     setEntry(_entry)
   }
 
-  const connect = () => tokenContract.methods.approve(pool, toWei('2000')).send({
-    from: accounts[0]
-  }).on('confirmation', update)
-
-  const decreaseAllowance = () => tokenContract.methods.decreaseAllowance(pool, toWei('20'))
-    .send({
-      from: accounts[0]
-    })
-    .on('confirmation', update)
-
   const buy = async () => {
     if (!poolInfo) return
     try {
@@ -221,25 +184,6 @@ const App: React.FC = () => {
   /**
    * Pool Methods
    */
-  const lock = async () => {
-    if (!poolInfo || !isPoolOwner) return
-    poolContract.methods.lock(secretHash).send({
-      from: accounts[0]
-    }).on('confirmation', update)
-  }
-
-  const unlock = () => {
-    if (!poolInfo || !isPoolOwner) return
-    poolContract.methods.unlock().send({
-      from: accounts[0]
-    }).on('confirmation', update)
-  }
-
-  const complete = async () => {
-    if (!isPoolOwner) return
-    await poolContract.methods.complete(secret).send({
-      from: accounts[0]
-    }).on('confirmation', update)
   }
 
   if (!manager) return null
@@ -338,21 +282,23 @@ const App: React.FC = () => {
             </div>
             <h4>Address: {pool}</h4>
             <div className="pool-grid-container">
-              {pool && (<div className="pool-info-1">
-                <table>
+              {pool && (<table className="pool-info-1">
                   <tbody>
                   <tr>
-                    <td><strong>State:</strong></td>
+                    <td style={{width: 50}}><strong>State:</strong></td>
                     <td>
-                      {PoolState[poolInfo.poolState]}
-                      {poolInfo.poolState === 0 && isPoolOwner && <button style={{marginLeft: 10}} onClick={lock}>Lock</button>}
-                      {poolInfo.poolState === 1 && isPoolOwner && <button style={{marginLeft: 10}} onClick={unlock}>Unlock</button>}
-                      {poolInfo.poolState === 2 && isPoolOwner && <button style={{marginLeft: 10}} onClick={complete}>Complete</button>}
+                      <span style={{fontSize: 50}}>{PoolState[poolInfo.poolState]}</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={2}>
+                      {poolInfo.poolState === 0 && isPoolOwner && <button style={{width: '100%'}} onClick={lock}>Lock</button>}
+                      {poolInfo.poolState === 1 && isPoolOwner && <button style={{width: '100%'}} onClick={unlock}>Unlock</button>}
+                      {poolInfo.poolState === 2 && isPoolOwner && <button style={{width: '100%'}} onClick={complete}>Complete</button>}
                     </td>
                   </tr>
                   </tbody>
-                </table>
-              </div>)}
+                </table>)}
               <div className="pool-info-2">
                 <table>
                   <tbody>
@@ -362,10 +308,12 @@ const App: React.FC = () => {
                     const showWinner = name === 'winner'
                     const winner = showWinner && value === '0x0000000000000000000000000000000000000000' ? 'TBA' : value
                     name = name === 'estimatedInterestFixedPoint18' ? 'estimatedInterest' : name
-                    return (<tr key={name.toString()}>
+                    const full = <tr key={name}>
                       <td><strong>{startCase(name)}:</strong></td>
                       <td>{showWinner ? winner : convert ? `${asDai(value)} DAI` : value}</td>
-                    </tr>)
+                    </tr>
+                    if (['ticketCost', 'supplyBalanceTotal', 'maxPoolSize'].includes(name)) return
+                    return (!['ticketCost', 'supplyBalanceTotal', 'maxPoolSize'].includes(name) && full)
                   })}
                   </tbody>
                 </table>
