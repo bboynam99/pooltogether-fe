@@ -16,14 +16,15 @@ export const PoolManager: React.FC<PoolManagerProps> = ({
   poolManagerInfo,
 }: PoolManagerProps) => {
   const { createPool } = PoolManagerContract()
-
   return (
     <div>
       <h2>Pool Management</h2>
       <div style={{ textAlign: 'center', marginTop: 10, marginBottom: 20 }}>
         <button
           disabled={!currentPoolComplete}
-          onClick={() => createPool(accounts[0], onConfirmation)}
+          onClick={() => createPool(accounts[0], (confirmationNumber: number = 1) => {
+            onConfirmation(confirmationNumber)
+          })}
           style={{ width: '100%' }}
         >
           Create Pool

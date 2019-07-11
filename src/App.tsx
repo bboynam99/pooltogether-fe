@@ -115,7 +115,7 @@ const App: React.FC = () => {
 
   useEffect(updateEffectHandler, [accounts])
 
-  if (!poolManagerContract || !poolContract || !tokenContract) return loading
+  if (!poolManagerContract || !poolContract || !tokenContract || !poolEvents) return loading
 
   const connect = () => tokenContract.approve(pool, accounts[0], update)
 
@@ -422,8 +422,8 @@ const App: React.FC = () => {
                 </table>
               </div>
             </div>
-            <Purchases address={accounts[0]} purchases={poolEvents ? poolEvents[PoolEvent.BOUGHT_TICKETS] : []} />
-            <Withdrawals withdrawals={poolEvents ? poolEvents[PoolEvent.WITHDRAWN] : []} />
+            <Purchases address={accounts[0]} purchases={poolEvents[PoolEvent.BOUGHT_TICKETS]} />
+            <Withdrawals withdrawals={poolEvents[PoolEvent.WITHDRAWN]} />
           </div>
 
           <div className="fns cell">
