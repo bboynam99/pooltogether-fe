@@ -1,6 +1,14 @@
-import React, { ChangeEvent, useEffect, useState } from 'react'
 import { get, startCase } from 'lodash'
-import { ContractData } from './contracts/contract.model'
+import React, { ChangeEvent, useEffect, useState } from 'react'
+
+import './App.css'
+import { ContractData, getContractData } from './contracts/contract.model'
+import { PoolInfo, PoolInstance, PoolState, PoolStats } from './contracts/pool/PoolContract'
+import { Purchases } from './contracts/pool/Purchases'
+import { Withdrawals } from './contracts/pool/Withdrawals'
+import { PoolManager } from './contracts/poolManager/PoolManager'
+import { PoolManagerInstance, } from './contracts/poolManager/PoolManagerContract'
+import { TokenInstance } from './contracts/token/TokenContract'
 import {
   abiEncodeSecret,
   asciiToHex,
@@ -10,56 +18,9 @@ import {
   removeAccountsChanged,
   soliditySha3
 } from './web3'
-import PoolContract, { PoolInfo, PoolInstance, PoolState } from './contracts/pool/PoolContract'
-import PoolManagerContract, {
-  PoolManagerInstance,
-} from './contracts/poolManager/PoolManagerContract'
-import TokenContract, { TokenInstance } from './contracts/token/TokenContract'
-import { PoolManager } from './contracts/poolManager/PoolManager'
-
-import './App.css'
 
 const secret: any = asciiToHex('test_pool')
 const secretHash: string = soliditySha3(abiEncodeSecret(secret))
-
-const getContractData = async (accounts: string[]): Promise<ContractData> => {
-  if (!accounts) throw new Error('No accounts supplied')
-  const _account = accounts[0]
-
-  // Pool Manager
-  const _poolManagerContract = PoolManagerContract()
-  const _poolManagerInfo = await _poolManagerContract.getInfo()
-  const _isPoolManager = await _poolManagerContract.isManager(_account)
-
-  // Current Pool
-  const _poolContract = PoolContract(_poolManagerInfo._currentPool)
-  const _poolInfo = await _poolContract.getInfo()
-  const _isPoolOwner = await _poolContract.isOwner(_account)
-  const _entry = await _poolContract.getEntry(_account)
-  const _winnings = await _poolContract.winnings(_account)
-
-  // Token
-  const _tokenContract = TokenContract()
-  const allowance = await _tokenContract.allowance(_account, _poolManagerInfo._currentPool)
-  const _balance = await _tokenContract.balanceOf(_account)
-
-  return {
-    _poolContract,
-    _poolManagerContract,
-    _tokenContract,
-    _isPoolManager,
-    _isPoolOwner,
-    _balance,
-    _winnings,
-    _allowance: Number(fromWei(allowance.toString())),
-    _lockDuration: _poolManagerInfo._lockDurationInBlocks,
-    _openDuration: _poolManagerInfo._openDurationInBlocks,
-    _pool: _poolManagerInfo._currentPool,
-    _entry,
-    _poolManagerInfo,
-    _poolInfo,
-  }
-}
 
 const App: React.FC = () => {
   const [accounts, setAccounts] = useState<string[]>([])
@@ -77,6 +38,7 @@ const App: React.FC = () => {
   const [pool, setPool] = useState()
   const [isPoolOwner, setIsPoolOwner] = useState(false)
   const [poolInfo, setPoolInfo] = useState<PoolInfo>()
+  const [poolStats, setPoolStats] = useState<PoolStats>()
 
   // player
   const [isWinner, setIsWinner] = useState(false)
@@ -119,6 +81,7 @@ const App: React.FC = () => {
         _entry,
         _pool,
         _poolInfo,
+        _poolStats,
         _poolManagerInfo,
       }: ContractData) => {
         setPoolManagerContract(_poolManagerContract)
@@ -131,6 +94,7 @@ const App: React.FC = () => {
 
         setPool(_pool)
         setPoolInfo(_poolInfo)
+        setPoolStats(_poolStats)
         setIsOpen(_poolInfo.poolState === PoolState.OPEN)
         setIsLocked(_poolInfo.poolState === PoolState.LOCKED)
         setIsUnlocked(_poolInfo.poolState === PoolState.UNLOCKED)
@@ -158,6 +122,7 @@ const App: React.FC = () => {
       _poolContract,
       _poolManagerContract,
       _poolInfo,
+      _poolStats,
       _poolManagerInfo,
       _tokenContract,
       _winnings,
@@ -172,6 +137,7 @@ const App: React.FC = () => {
 
     setPool(_pool)
     setPoolInfo(_poolInfo)
+    setPoolStats(_poolStats)
     setIsOpen(_poolInfo.poolState === PoolState.OPEN)
     setIsLocked(_poolInfo.poolState === PoolState.LOCKED)
     setIsUnlocked(_poolInfo.poolState === PoolState.UNLOCKED)
@@ -217,169 +183,49 @@ const App: React.FC = () => {
   return (
     <div className="App">
       {poolInfo && poolManagerInfo ? (
-        <div>
-          <div className="grid-container">
-            <div className="header">
-              <h1>Pooltogether Test Interface</h1>
-            </div>
+        <div className="grid-container">
 
-            <div className="menu cell">
-              <h4
-                style={{ cursor: 'pointer', color: showPc ? 'red' : '' }}
-                onClick={() => {
-                  setShowPmc(false)
-                  setShowPc(!showPc)
-                }}
-              >
-                Pool Contract Methods
-              </h4>
-              <h4
-                style={{ cursor: 'pointer', color: showPmc ? 'red' : '' }}
-                onClick={() => {
-                  setShowPc(false)
-                  setShowPmc(!showPmc)
-                }}
-              >
-                Pool Manager Contract Methods
-              </h4>
-              <hr />
+          <div className="header">
+            <h1>Pooltogether Test Interface</h1>
+          </div>
 
-              {isPoolManager && (
-                <PoolManager
-                  accounts={accounts}
-                  currentPoolComplete={isComplete}
-                  onConfirmation={update}
-                  poolManagerInfo={poolManagerInfo}
-                />
-              )}
+          <div className="menu cell">
+            <h4
+              style={{ cursor: 'pointer', color: showPc ? 'red' : '' }}
+              onClick={() => {
+                setShowPmc(false)
+                setShowPc(!showPc)
+              }}
+            >
+              Pool Contract Methods
+            </h4>
+            <h4
+              style={{ cursor: 'pointer', color: showPmc ? 'red' : '' }}
+              onClick={() => {
+                setShowPc(false)
+                setShowPmc(!showPmc)
+              }}
+            >
+              Pool Manager Contract Methods
+            </h4>
+            <hr />
 
-              <h4>Previous Pools</h4>
-            </div>
-
-            {entry && (
-              <div className="entry cell">
-                <h2>Your Pooltogether</h2>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <div>
-                    <table>
-                      <tbody>
-                        <tr>
-                          <td>
-                            <strong>Address:</strong>
-                          </td>
-                          <td>{accounts[0]}</td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <strong>Tickets:</strong>
-                          </td>
-                          <td>{entry.ticketCount.toNumber()}</td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <strong>Deposit:</strong>
-                          </td>
-                          <td>{fromWei(deposited.toString())} DAI</td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <strong>Winnings:</strong>
-                          </td>
-                          <td>{fromWei(String(winnings - deposited))} DAI</td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <strong>Withdrawn:</strong>
-                          </td>
-                          <td>{fromWei(withdrawn.toString())} DAI</td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <strong>Balance:</strong>
-                          </td>
-                          <td>{fromWei(String(balance))} DAI</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div
-                    style={{
-                      minHeight: 200,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-end',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    {isWinner && (
-                      <div>
-                        <h1 style={{ textAlign: 'right' }}>Winner, winner, chicken dinner!</h1>
-                        <p
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'flex-end',
-                          }}
-                        >
-                          <span>You won</span>
-                          <strong style={{ fontSize: 38, marginLeft: 10 }}>
-                            {fromWei(String(winnings - deposited))} DAI
-                          </strong>
-                        </p>
-                      </div>
-                    )}
-                    {isComplete && isWinner && balance === 0 && (
-                      <p>Your winnings have been withdrawn. Thanks for playing!</p>
-                    )}
-                    {!isComplete && (
-                      <div>
-                        <strong>Allowance:</strong> {allowance} DAI
-                      </div>
-                    )}
-                    {allowance <= 0 && !isComplete ? (
-                      <button onClick={connect}>Connect to Pool</button>
-                    ) : (
-                      <div>
-                        {!isComplete && (
-                          <input
-                            type="number"
-                            min={1}
-                            value={numTixToBuy}
-                            onChange={(evt: ChangeEvent<HTMLInputElement>) =>
-                              setNumTixToBuy(Number(evt.target.value))
-                            }
-                          />
-                        )}
-                        <div className="actions">
-                          {isComplete && balance > 0 && (
-                            <button onClick={withdraw}>Withdraw</button>
-                          )}
-                          {isOpen && allowance > 0 && (
-                            <button onClick={buy}>
-                              Buy {numTixToBuy === 1 ? 'a' : numTixToBuy} Ticket
-                              {numTixToBuy > 1 && 's'}
-                            </button>
-                          )}
-                          {!isComplete && (
-                            <button onClick={decreaseAllowance}>Decrease Allowance</button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <hr />
-              </div>
+            {isPoolManager && (
+              <PoolManager
+                accounts={accounts}
+                currentPoolComplete={isComplete}
+                onConfirmation={update}
+                poolManagerInfo={poolManagerInfo}
+              />
             )}
 
-            <div className="poolInfo cell">
+            <h4>Previous Pools</h4>
+          </div>
+
+          {entry && (
+            <div className="entry cell">
+              <h2>Your Pooltogether</h2>
+
               <div
                 style={{
                   display: 'flex',
@@ -387,150 +233,273 @@ const App: React.FC = () => {
                   justifyContent: 'space-between',
                 }}
               >
-                <h2 style={{ marginTop: 0, marginBottom: 0 }}>Current Pool Info</h2>
-                <span>
+                <div>
+                  <table>
+                    <tbody>
+                    <tr>
+                      <td>
+                        <strong>Address:</strong>
+                      </td>
+                      <td>{accounts[0]}</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>Tickets:</strong>
+                      </td>
+                      <td>{entry.ticketCount.toNumber()}</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>Deposit:</strong>
+                      </td>
+                      <td>{fromWei(deposited.toString())} DAI</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>Winnings:</strong>
+                      </td>
+                      <td>{fromWei(String(winnings - deposited))} DAI</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>Withdrawn:</strong>
+                      </td>
+                      <td>{fromWei(withdrawn.toString())} DAI</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>Balance:</strong>
+                      </td>
+                      <td>{fromWei(String(balance))} DAI</td>
+                    </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div
+                  style={{
+                    minHeight: 200,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  {isWinner && (
+                    <div>
+                      <h1 style={{ textAlign: 'right' }}>Winner, winner, chicken dinner!</h1>
+                      <p
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'flex-end',
+                        }}
+                      >
+                        <span>You won</span>
+                        <strong style={{ fontSize: 38, marginLeft: 10 }}>
+                          {fromWei(String(winnings - deposited))} DAI
+                        </strong>
+                      </p>
+                    </div>
+                  )}
+                  {isComplete && isWinner && balance === 0 && (
+                    <p>Your winnings have been withdrawn. Thanks for playing!</p>
+                  )}
+                  {!isComplete && (
+                    <div>
+                      <strong>Allowance:</strong> {allowance} DAI
+                    </div>
+                  )}
+                  {allowance <= 0 && !isComplete ? (
+                    <button onClick={connect}>Connect to Pool</button>
+                  ) : (
+                    <div>
+                      {!isComplete && (
+                        <input
+                          type="number"
+                          min={1}
+                          value={numTixToBuy}
+                          onChange={(evt: ChangeEvent<HTMLInputElement>) =>
+                            setNumTixToBuy(Number(evt.target.value))
+                          }
+                        />
+                      )}
+                      <div className="actions">
+                        {isComplete && balance > 0 && (
+                          <button onClick={withdraw}>Withdraw</button>
+                        )}
+                        {isOpen && allowance > 0 && (
+                          <button onClick={buy}>
+                            Buy {numTixToBuy === 1 ? 'a' : numTixToBuy} Ticket
+                            {numTixToBuy > 1 && 's'}
+                          </button>
+                        )}
+                        {!isComplete && (
+                          <button onClick={decreaseAllowance}>Decrease Allowance</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <hr />
+            </div>
+          )}
+
+          <div className="poolInfo cell">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <h2 style={{ marginTop: 0, marginBottom: 0 }}>Current Pool Info</h2>
+              <span>
                   <strong>Total Pool Capital:</strong> {fromWei(poolInfo.entryTotal.toString())} DAI
                 </span>
-              </div>
-              <h4>Address: {pool}</h4>
-              <div className="pool-grid-container">
-                {pool && (
-                  <table className="pool-info-1">
-                    <tbody>
-                      <tr>
-                        <td style={{ width: 50 }}>
-                          <strong>State:</strong>
+            </div>
+            <h4>Address: {pool}</h4>
+            <div className="pool-grid-container">
+              {pool && (
+                <table className="pool-info-1">
+                  <tbody>
+                  <tr>
+                    <td style={{ width: 50 }}>
+                      <strong>State:</strong>
+                    </td>
+                    <td>
+                      <span style={{ fontSize: 50 }}>{PoolState[poolInfo.poolState]}</span>
+                    </td>
+                  </tr>
+                  {isPoolOwner && (
+                    <tr>
+                      <td colSpan={2}>
+                        {isOpen && (
+                          <button style={{ width: '100%' }} onClick={lock}>
+                            Lock
+                          </button>
+                        )}
+                        {isLocked && (
+                          <button style={{ width: '100%' }} onClick={unlock}>
+                            Unlock
+                          </button>
+                        )}
+                        {isUnlocked && (
+                          <button style={{ width: '100%' }} onClick={complete}>
+                            Complete
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </tbody>
+                </table>
+              )}
+              <div className="pool-info-2">
+                <table>
+                  <tbody>
+                  {[
+                    'ticketCost',
+                    'supplyBalanceTotal',
+                    'maxPoolSize',
+                    'startBlock',
+                    'endBlock',
+                  ].map((name: string) => {
+                    const value = get(poolInfo, name).toString()
+                    const convert = [
+                      'ticketCost',
+                      'maxPoolSize',
+                      'supplyBalanceTotal',
+                    ].includes(name)
+                    const showWinner = name === 'winner'
+                    const winner =
+                      showWinner && value === '0x0000000000000000000000000000000000000000'
+                        ? 'TBA'
+                        : value
+                    name = name === 'estimatedInterestFixedPoint18' ? 'estimatedInterest' : name
+                    const full = (
+                      <tr key={name}>
+                        <td>
+                          <strong>{startCase(name)}:</strong>
                         </td>
                         <td>
-                          <span style={{ fontSize: 50 }}>{PoolState[poolInfo.poolState]}</span>
+                          {showWinner ? winner : convert ? `${fromWei(value)} DAI` : value}
                         </td>
                       </tr>
-                      {isPoolOwner && (
-                        <tr>
-                          <td colSpan={2}>
-                            {isOpen && (
-                              <button style={{ width: '100%' }} onClick={lock}>
-                                Lock
-                              </button>
-                            )}
-                            {isLocked && (
-                              <button style={{ width: '100%' }} onClick={unlock}>
-                                Unlock
-                              </button>
-                            )}
-                            {isUnlocked && (
-                              <button style={{ width: '100%' }} onClick={complete}>
-                                Complete
-                              </button>
-                            )}
+                    )
+                    return (
+                      !['ticketCost', 'supplyBalanceTotal', 'maxPoolSize'].includes(name) &&
+                      full
+                    )
+                  })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="pool-info-3">
+                <table>
+                  <tbody>
+                  {['participantCount', 'estimatedInterestFixedPoint18', 'winner'].map(
+                    (name: string) => {
+                      const value = get(poolInfo, name).toString()
+                      const convert = ['estimatedInterestFixedPoint18'].includes(name)
+                      const showWinner = name === 'winner'
+                      const winner =
+                        showWinner && value === '0x0000000000000000000000000000000000000000'
+                          ? 'TBA'
+                          : value
+                      name =
+                        name === 'estimatedInterestFixedPoint18' ? 'estimatedInterest' : name
+                      return (
+                        <tr key={name.toString()}>
+                          <td>
+                            <strong>{startCase(name)}:</strong>
+                          </td>
+                          <td>
+                            {showWinner ? winner : convert ? `${fromWei(value)} DAI` : value}
                           </td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                )}
-                <div className="pool-info-2">
-                  <table>
-                    <tbody>
-                      {[
-                        'ticketCost',
-                        'supplyBalanceTotal',
-                        'maxPoolSize',
-                        'startBlock',
-                        'endBlock',
-                      ].map((name: string) => {
-                        const value = get(poolInfo, name).toString()
-                        const convert = [
-                          'ticketCost',
-                          'maxPoolSize',
-                          'supplyBalanceTotal',
-                        ].includes(name)
-                        const showWinner = name === 'winner'
-                        const winner =
-                          showWinner && value === '0x0000000000000000000000000000000000000000'
-                            ? 'TBA'
-                            : value
-                        name = name === 'estimatedInterestFixedPoint18' ? 'estimatedInterest' : name
-                        const full = (
-                          <tr key={name}>
-                            <td>
-                              <strong>{startCase(name)}:</strong>
-                            </td>
-                            <td>
-                              {showWinner ? winner : convert ? `${fromWei(value)} DAI` : value}
-                            </td>
-                          </tr>
-                        )
-                        return (
-                          !['ticketCost', 'supplyBalanceTotal', 'maxPoolSize'].includes(name) &&
-                          full
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="pool-info-3">
-                  <table>
-                    <tbody>
-                      {['participantCount', 'estimatedInterestFixedPoint18', 'winner'].map(
-                        (name: string) => {
-                          const value = get(poolInfo, name).toString()
-                          const convert = ['estimatedInterestFixedPoint18'].includes(name)
-                          const showWinner = name === 'winner'
-                          const winner =
-                            showWinner && value === '0x0000000000000000000000000000000000000000'
-                              ? 'TBA'
-                              : value
-                          name =
-                            name === 'estimatedInterestFixedPoint18' ? 'estimatedInterest' : name
-                          return (
-                            <tr key={name.toString()}>
-                              <td>
-                                <strong>{startCase(name)}:</strong>
-                              </td>
-                              <td>
-                                {showWinner ? winner : convert ? `${fromWei(value)} DAI` : value}
-                              </td>
-                            </tr>
-                          )
-                        },
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      )
+                    },
+                  )}
+                  </tbody>
+                </table>
               </div>
             </div>
+            <hr />
+            <Purchases purchases={poolStats ? poolStats.purchases : []} />
+            <hr />
+            <Withdrawals withdrawals={poolStats ? poolStats.withdrawals : []} />
+            <hr />
+          </div>
 
-            <div className="fns cell">
-              <hr />
-              <div style={{ display: showPmc ? 'block' : 'none' }}>
-                <h2>Pool Manager Contract Methods</h2>
-                <ul style={{ padding: 0 }}>
-                  {Object.keys(poolManagerContract.methodDocs).map((name: string) => (
-                    <li key={name}>
-                      <strong>{name}</strong>
-                      <br />
-                      <p style={{ marginLeft: 20 }}>
-                        {methodDescription(poolManagerContract.methodDocs[name])}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div style={{ display: showPc ? 'block' : 'none' }}>
-                <h2>Pool Contract Methods</h2>
-                <ul style={{ padding: 0 }}>
-                  {Object.keys(poolContract.methodDocs).map((name: string) => (
-                    <li key={name}>
-                      <strong>{name}</strong>
-                      <br />
-                      <p style={{ marginLeft: 20 }}>
-                        {methodDescription(poolContract.methodDocs[name])}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          <div className="fns cell">
+            <div style={{ display: showPmc ? 'block' : 'none' }}>
+              <h2>Pool Manager Contract Methods</h2>
+              <ul style={{ padding: 0 }}>
+                {Object.keys(poolManagerContract.methodDocs).map((name: string) => (
+                  <li key={name}>
+                    <strong>{name}</strong>
+                    <br />
+                    <p style={{ marginLeft: 20 }}>
+                      {methodDescription(poolManagerContract.methodDocs[name])}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div style={{ display: showPc ? 'block' : 'none' }}>
+              <h2>Pool Contract Methods</h2>
+              <ul style={{ padding: 0 }}>
+                {Object.keys(poolContract.methodDocs).map((name: string) => (
+                  <li key={name}>
+                    <strong>{name}</strong>
+                    <br />
+                    <p style={{ marginLeft: 20 }}>
+                      {methodDescription(poolContract.methodDocs[name])}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>

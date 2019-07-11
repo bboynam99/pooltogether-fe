@@ -1,7 +1,21 @@
-import { getContract } from '../../web3'
+import { fromWei, getContract } from '../../web3'
 import { pick } from 'lodash'
-import { OnConfirmationHandler } from '../contract.model'
+import { allEventsOptions, OnConfirmationHandler, PoolEventReponse } from '../contract.model'
 import PoolContractJSON from './Pool.json'
+
+export enum PoolEvent {
+  BOUGHT_TICKETS = 'BoughtTickets',
+  WITHDRAWN = 'Withdrawn',
+  POOL_LOCKED = 'PoolLocked',
+  POOL_UNLOCKED = 'PoolUnlocked',
+  POOL_COMPLETE = 'PoolComplete',
+  ALL = 'allEvents'
+}
+
+export interface PoolStats {
+  purchases: Purchase[]
+  withdrawals: Withdrawal[]
+}
 
 export enum PoolState {
   OPEN,
@@ -24,17 +38,34 @@ export interface PoolInfo {
   hashOfSecret: string
 }
 
+export interface Purchase {
+  buyer: string
+  tickets: number
+  total: number
+  transactionHash: string
+}
+
+export interface Withdrawal {
+  destination: string
+  amount: number
+  transactionHash: string
+}
+
 export interface PoolInstance {
   buyTickets: (
     numTix: number,
     account: string,
-    callback: (confirmationNumber: number) => void,
+    callback: OnConfirmationHandler,
   ) => Promise<void>
   complete: (address: string, secret: string, callback: OnConfirmationHandler) => Promise<void>
   getEntry: (account: string) => Promise<any>
   getInfo: () => Promise<PoolInfo>
+  getPastEvents: (type: PoolEvent, options: any) => Promise<PoolEventReponse[]>
+  getPurchases: () => Promise<Purchase[]>
+  getWithdrawals: () => Promise<Withdrawal[]>
   isOwner: (address: string) => Promise<boolean>
   lock: (address: string, secretHash: string, callback: OnConfirmationHandler) => Promise<void>
+  netWinnings: () => Promise<number>
   unlock: (address: string, callback: OnConfirmationHandler) => Promise<void>
   winnings: (account: string) => Promise<number>
   withdraw: (account: string, callback: OnConfirmationHandler) => Promise<void>
@@ -52,6 +83,7 @@ export default (poolAddress: string): PoolInstance => {
     getInfo,
     isOwner,
     lock,
+    netWinnings,
     unlock,
     winnings,
     withdraw,
@@ -97,6 +129,29 @@ export default (poolAddress: string): PoolInstance => {
         ]),
       )
 
+  const _getPastEvents = (type: PoolEvent, options: any = allEventsOptions) => contract.getPastEvents(type, options)
+
+  const _getPurchases = async () => {
+    const stuff = await _getPastEvents(PoolEvent.ALL)
+    console.log(stuff)
+    return _getPastEvents(PoolEvent.BOUGHT_TICKETS).then((events: PoolEventReponse[]) => events.map(evt => ({
+      buyer: evt.returnValues.sender,
+      tickets: evt.returnValues.count.toNumber(),
+      total: Number(fromWei(evt.returnValues.totalPrice.toString())),
+      transactionHash: evt.transactionHash
+    })) )
+  }
+
+  const _getWithdrawals = async () => {
+    const events = await _getPastEvents(PoolEvent.POOL_LOCKED)
+    console.log(events)
+    return events.map(evt => ({
+      amount: Number(fromWei(evt.returnValues.amount.toString())),
+      destination: evt.returnValues.sender,
+      transactionHash: evt.transactionHash
+    }))
+  }
+
   const _isOwner = (address: string) => isOwner().call({ from: address })
 
   const _lock = (address: string, secretHash: string, callback: OnConfirmationHandler) =>
@@ -105,6 +160,8 @@ export default (poolAddress: string): PoolInstance => {
         from: address,
       })
       .on('confirmation', callback)
+
+  const _netWinnings = () => netWinnings().call()
 
   const _unlock = (address: string, callback: OnConfirmationHandler) =>
     unlock()
@@ -128,9 +185,13 @@ export default (poolAddress: string): PoolInstance => {
     complete: _complete,
     getEntry: _getEntry,
     getInfo: _getInfo,
+    getPastEvents: _getPastEvents,
+    getPurchases: _getPurchases,
+    getWithdrawals: _getWithdrawals,
     isOwner: _isOwner,
     lock: _lock,
     methodDocs: _methodDocs,
+    netWinnings: _netWinnings,
     unlock: _unlock,
     winnings: _winnings,
     withdraw: _withdraw,
