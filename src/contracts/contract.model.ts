@@ -33,12 +33,17 @@ export const allEventsOptions = {
   toBlock: 'latest',
 }
 
-export interface PoolEventReponse {
+export interface PoolEventResponse {
   transactionHash: string
   event: string
   returnValues: {
+    amount?: any
+    count?: any
+    newOwner?: string
+    previousOwner?: string
     sender?: string
-    totalAmount?: number
+    totalAmount?: any
+    totalPrice?: any
   }
 }
 

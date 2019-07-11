@@ -1,15 +1,16 @@
 import { fromWei, getContract } from '../../web3'
 import { groupBy, pick } from 'lodash'
-import { allEventsOptions, OnConfirmationHandler, PoolEventReponse } from '../contract.model'
+import { allEventsOptions, OnConfirmationHandler, PoolEventResponse } from '../contract.model'
 import PoolContractJSON from './Pool.json'
 
 export enum PoolEvent {
+  ALL = 'allEvents',
   BOUGHT_TICKETS = 'BoughtTickets',
-  WITHDRAWN = 'Withdrawn',
   POOL_LOCKED = 'PoolLocked',
   POOL_UNLOCKED = 'PoolUnlocked',
   POOL_COMPLETE = 'PoolComplete',
-  ALL = 'allEvents',
+  OWNERSHIP_TRANSFERRED = 'OwnershipTransferred',
+  WITHDRAWN = 'Withdrawn',
 }
 
 export enum PoolState {
@@ -127,36 +128,42 @@ export default (poolAddress: string): PoolInstance => {
     type: PoolEvent = PoolEvent.ALL,
     options: any = allEventsOptions,
   ): Promise<any> =>
-    contract.getPastEvents(type, options).then((evts: PoolEventReponse[]) => {
-      const stuff = groupBy(
-        evts.map(evt => {
-          const { returnValues, transactionHash } = evt
-          console.log(returnValues)
-          const newEvent = {
-            event: returnValues.event,
-            transactionHash: transactionHash,
-          }
-          switch (returnValues.event) {
-            case PoolEvent.WITHDRAWN:
-              return {
-                ...newEvent,
-                amount: Number(fromWei(returnValues.amount.toString())),
-                destination: returnValues.sender,
-              }
-            case PoolEvent.BOUGHT_TICKETS:
-            default:
-              return {
-                ...newEvent,
-                buyer: returnValues.sender,
-                tickets: returnValues.count.toNumber(),
-                total: Number(fromWei(returnValues.totalPrice.toString())),
-              }
-          }
-        }),
-        'event',
-      )
-      return stuff
-    })
+    contract.getPastEvents(type, options).then((evts: PoolEventResponse[]) => groupBy(
+      evts.map(evt => {
+        const { event, returnValues, transactionHash } = evt
+        const newEvent = {
+          event,
+          transactionHash: transactionHash,
+        }
+        switch (event) {
+          case PoolEvent.WITHDRAWN:
+            return {
+              ...newEvent,
+              amount: Number(fromWei(returnValues.amount.toString())),
+              destination: returnValues.sender,
+            }
+          case PoolEvent.OWNERSHIP_TRANSFERRED:
+            return {
+              ...newEvent,
+              previousOwner: returnValues.previousOwner,
+              newOwner: returnValues.newOwner,
+            }
+          case PoolEvent.BOUGHT_TICKETS:
+            return {
+              ...newEvent,
+              buyer: returnValues.sender,
+              tickets: returnValues.count.toNumber(),
+              total: Number(fromWei(returnValues.totalPrice.toString())),
+            }
+          case PoolEvent.POOL_LOCKED:
+          case PoolEvent.POOL_UNLOCKED:
+          case PoolEvent.POOL_COMPLETE:
+          default:
+            return newEvent
+        }
+      }),
+      'event',
+    ))
 
   const _isOwner = (address: string) => isOwner().call({ from: address })
 

@@ -4,11 +4,13 @@ import React, { ChangeEvent, useEffect, useState } from 'react'
 import './App.css'
 import { ContractData, getContractData } from './contracts/contract.model'
 import {
-  PastPoolEvents,
+  PastPoolEvents, PoolEvent,
   PoolInfo,
   PoolInstance,
   PoolState,
 } from './contracts/pool/PoolContract'
+import { Purchases } from './contracts/pool/Purchases'
+import { Withdrawals } from './contracts/pool/Withdrawals'
 import { PoolManager } from './contracts/poolManager/PoolManager'
 import { PoolManagerInstance } from './contracts/poolManager/PoolManagerContract'
 import { TokenInstance } from './contracts/token/TokenContract'
@@ -155,6 +157,9 @@ const App: React.FC = () => {
   }
 
   if (!poolManagerContract || !poolContract || !tokenContract) return null
+
+
+  console.log(poolEvents)
 
   const connect = () => tokenContract.approve(pool, accounts[0], update)
 
@@ -459,10 +464,10 @@ const App: React.FC = () => {
               </div>
             </div>
             <hr />
-            {/*<Purchases purchases={poolStats ? poolStats.purchases : []} />*/}
-            {/*<hr />*/}
-            {/*<Withdrawals withdrawals={poolStats ? poolStats.withdrawals : []} />*/}
-            {/*<hr />*/}
+            <Purchases purchases={poolEvents ? poolEvents[PoolEvent.BOUGHT_TICKETS] : []} />
+            <hr />
+            <Withdrawals withdrawals={poolEvents ? poolEvents[PoolEvent.WITHDRAWN] : []} />
+            <hr />
           </div>
 
           <div className="fns cell">
