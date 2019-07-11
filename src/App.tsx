@@ -26,6 +26,7 @@ import {
 
 const secret: any = asciiToHex('test_pool')
 const secretHash: string = soliditySha3(abiEncodeSecret(secret))
+const loading = <div style={{ margin: 20 }}>Loading...</div>
 
 const App: React.FC = () => {
   const [accounts, setAccounts] = useState<string[]>([])
@@ -115,6 +116,8 @@ const App: React.FC = () => {
     )
   }, [accounts])
 
+  if (!poolManagerContract || !poolContract || !tokenContract) return loading
+
   const update = async (confirmationNum: number) => {
     if (confirmationNum > 1) return
     const {
@@ -156,11 +159,6 @@ const App: React.FC = () => {
     setEntry(_entry)
   }
 
-  if (!poolManagerContract || !poolContract || !tokenContract) return null
-
-
-  console.log(poolEvents)
-
   const connect = () => tokenContract.approve(pool, accounts[0], update)
 
   const decreaseAllowance = () => tokenContract.decreaseAllowance(pool, accounts[0], update)
@@ -184,8 +182,6 @@ const App: React.FC = () => {
 
   const methodDescription = (value: { notice: string } | string) =>
     typeof value === 'string' ? value : value.notice
-
-  ////////////////////////////////////////////////////////////////////////////////////////
 
   return (
     <div className="App">
@@ -501,9 +497,7 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-      ) : (
-        <div style={{ margin: 20 }}>Loading...</div>
-      )}
+      ) : loading}
     </div>
   )
 }

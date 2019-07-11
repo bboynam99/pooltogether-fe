@@ -1,4 +1,5 @@
 import React from 'react'
+import { FiExternalLink } from 'react-icons/fi'
 import { Withdrawal } from './PoolContract'
 
 interface WithdrawalsProps {
@@ -8,33 +9,27 @@ interface WithdrawalsProps {
 export const Withdrawals: React.FC<WithdrawalsProps> = ({ withdrawals }: WithdrawalsProps) => (
   <div>
     <h1>Withdrawals</h1>
-    {withdrawals.length ? (
+    {withdrawals ? (
       <table style={{ width: '100%' }}>
         <thead>
           <tr>
-            <th>
-              Destination
-              <br />
-              Transaction Hash
-            </th>
-            <th>amount</th>
+            <th style={{textAlign: 'left'}}>Destination</th>
+            <th style={{textAlign: 'right'}}>Amount</th>
           </tr>
         </thead>
         <tbody>
-          {withdrawals.map((p: Withdrawal) => (
-            <tr key={p.transactionHash}>
-              <td>
-                {p.destination}
-                <br />
-                {p.transactionHash}
+          {withdrawals.map(w => (
+            <tr key={w.transactionHash}>
+              <td style={{textAlign: 'left'}}>
+                <span>{w.destination}</span> <a style={{marginLeft: 20}} href={`https://etherscan.io/tx/${w.transactionHash}`} title="view transaction on Etherscan.io"><FiExternalLink /></a>
               </td>
-              <td>{p.amount}</td>
+              <td style={{textAlign: 'right'}}>{w.amount} DAI</td>
             </tr>
           ))}
         </tbody>
       </table>
     ) : (
-      <strong>There are no withdrawals</strong>
+      <span>There are no withdrawals</span>
     )}
   </div>
 )

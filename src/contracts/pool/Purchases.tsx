@@ -1,4 +1,5 @@
 import React from 'react'
+import { FiExternalLink } from 'react-icons/fi'
 import { Purchase } from './PoolContract'
 
 interface PurchasesProps {
@@ -8,35 +9,29 @@ interface PurchasesProps {
 export const Purchases: React.FC<PurchasesProps> = ({ purchases }: PurchasesProps) => (
   <div>
     <h1>Purchases</h1>
-    {purchases.length ? (
+    {purchases ? (
       <table style={{ width: '100%' }}>
         <thead>
           <tr>
-            <th>
-              Buyer
-              <br />
-              Transaction Hash
-            </th>
-            <th>Tickets</th>
-            <th>Total</th>
+            <th style={{textAlign: 'left'}}>Buyer</th>
+            <th style={{textAlign: 'right'}}>Tickets</th>
+            <th style={{textAlign: 'right'}}>Total</th>
           </tr>
         </thead>
         <tbody>
-          {purchases.map((p: Purchase) => (
+          {purchases.map(p => (
             <tr key={p.transactionHash}>
-              <td>
-                {p.buyer}
-                <br />
-                {p.transactionHash}
+              <td style={{textAlign: 'left'}}>
+                <span>{p.buyer}</span> <a style={{marginLeft: 20}} href={`https://etherscan.io/tx/${p.transactionHash}`} title="view transaction on Etherscan.io"><FiExternalLink /></a>
               </td>
-              <td>{p.tickets}</td>
-              <td>{p.total}</td>
+              <td style={{textAlign: 'right'}}>{p.tickets}</td>
+              <td style={{textAlign: 'right'}}>{p.total} DAI</td>
             </tr>
           ))}
         </tbody>
       </table>
     ) : (
-      <strong>There are no purchases</strong>
+      <span>There are no purchases</span>
     )}
   </div>
 )

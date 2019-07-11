@@ -53,7 +53,6 @@ const _tokenContract = TokenContract()
 export const getContractData = async (accounts: string[]): Promise<ContractData> => {
   if (!accounts) throw new Error('No accounts supplied')
   const _account = accounts[0]
-  console.log('account', _account)
 
   // Pool Manager
   const _poolManagerInfo = await _poolManagerContract.getInfo()
@@ -62,6 +61,7 @@ export const getContractData = async (accounts: string[]): Promise<ContractData>
   // Current Pool
   const _poolContract = PoolContract(_poolManagerInfo._currentPool)
   const _poolInfo = await _poolContract.getInfo()
+  const _poolEvents = await _poolContract.getPastEvents()
   const _isPoolOwner = await _poolContract.isOwner(_account)
   const _entry = await _poolContract.getEntry(_account)
   const _netWinnings = await _poolContract.netWinnings()
@@ -71,7 +71,6 @@ export const getContractData = async (accounts: string[]): Promise<ContractData>
   const allowance = await _tokenContract.allowance(_account, _poolManagerInfo._currentPool)
   const _balance = await _tokenContract.balanceOf(_account)
 
-  const _poolEvents = await _poolContract.getPastEvents()
 
   return {
     _poolContract,
