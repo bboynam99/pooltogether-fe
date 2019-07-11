@@ -1,9 +1,6 @@
 import { fromWei } from '../web3'
-import PoolContract, {
-  PastPoolEvents,
-  PoolInfo,
-  PoolInstance,
-} from './pool/PoolContract'
+import { PastPoolEvents, PoolInfo, PoolInstance } from './pool/pool.model'
+import PoolContract from './pool/PoolContract'
 import PoolManagerContract, { PoolManagerInstance } from './poolManager/PoolManagerContract'
 import TokenContract, { TokenInstance } from './token/TokenContract'
 
@@ -33,20 +30,6 @@ export const allEventsOptions = {
   toBlock: 'latest',
 }
 
-export interface PoolEventResponse {
-  transactionHash: string
-  event: string
-  returnValues: {
-    amount?: any
-    count?: any
-    newOwner?: string
-    previousOwner?: string
-    sender?: string
-    totalAmount?: any
-    totalPrice?: any
-  }
-}
-
 const _poolManagerContract = PoolManagerContract()
 const _tokenContract = TokenContract()
 
@@ -66,12 +49,11 @@ export const getContractData = async (accounts: string[]): Promise<ContractData>
   const _entry = await _poolContract.getEntry(_account)
   const _netWinnings = await _poolContract.netWinnings()
   const _winnings = await _poolContract.winnings(_account)
-
   // Token
   const allowance = await _tokenContract.allowance(_account, _poolManagerInfo._currentPool)
   const _balance = await _tokenContract.balanceOf(_account)
 
-
+  // console.log(_poolEvents)
   return {
     _poolContract,
     _poolManagerContract,

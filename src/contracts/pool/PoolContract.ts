@@ -1,71 +1,8 @@
-import { fromWei, getContract } from '../../web3'
-import { groupBy, pick } from 'lodash'
-import { allEventsOptions, OnConfirmationHandler, PoolEventResponse } from '../contract.model'
+import { getContract } from '../../web3'
+import { pick } from 'lodash'
+import { allEventsOptions, OnConfirmationHandler } from '../contract.model'
 import PoolContractJSON from './Pool.json'
-
-export enum PoolEvent {
-  ALL = 'allEvents',
-  BOUGHT_TICKETS = 'BoughtTickets',
-  POOL_LOCKED = 'PoolLocked',
-  POOL_UNLOCKED = 'PoolUnlocked',
-  POOL_COMPLETE = 'PoolComplete',
-  OWNERSHIP_TRANSFERRED = 'OwnershipTransferred',
-  WITHDRAWN = 'Withdrawn',
-}
-
-export enum PoolState {
-  OPEN,
-  LOCKED,
-  UNLOCKED,
-  COMPLETE,
-}
-
-export interface PoolInfo {
-  entryTotal: number
-  startBlock: number
-  endBlock: number
-  poolState: PoolState
-  winner: string
-  supplyBalanceTotal: number
-  ticketCost: number
-  participantCount: number
-  maxPoolSize: number
-  estimatedInterestFixedPoint18: number
-  hashOfSecret: string
-}
-
-export interface Purchase {
-  buyer: string
-  tickets: number
-  total: number
-  transactionHash: string
-}
-
-export interface Withdrawal {
-  destination: string
-  amount: number
-  transactionHash: string
-}
-
-export interface PastPoolEvents {
-  [PoolEvent.BOUGHT_TICKETS]: Purchase[]
-  [PoolEvent.WITHDRAWN]: Withdrawal[]
-}
-
-export interface PoolInstance {
-  buyTickets: (numTix: number, account: string, callback: OnConfirmationHandler) => Promise<void>
-  complete: (address: string, secret: string, callback: OnConfirmationHandler) => Promise<void>
-  getEntry: (account: string) => Promise<any>
-  getInfo: () => Promise<PoolInfo>
-  getPastEvents: (type?: PoolEvent, options?: any) => Promise<PastPoolEvents>
-  isOwner: (address: string) => Promise<boolean>
-  lock: (address: string, secretHash: string, callback: OnConfirmationHandler) => Promise<void>
-  netWinnings: () => Promise<number>
-  unlock: (address: string, callback: OnConfirmationHandler) => Promise<void>
-  winnings: (account: string) => Promise<number>
-  withdraw: (account: string, callback: OnConfirmationHandler) => Promise<void>
-  methodDocs: { [key: string]: { notice: string } | string }
-}
+import { formatPastEvents, PoolEvent, PoolInfo, PoolInstance } from './pool.model'
 
 const pAbi: any = PoolContractJSON.abi
 
@@ -128,42 +65,7 @@ export default (poolAddress: string): PoolInstance => {
     type: PoolEvent = PoolEvent.ALL,
     options: any = allEventsOptions,
   ): Promise<any> =>
-    contract.getPastEvents(type, options).then((evts: PoolEventResponse[]) => groupBy(
-      evts.map(evt => {
-        const { event, returnValues, transactionHash } = evt
-        const newEvent = {
-          event,
-          transactionHash: transactionHash,
-        }
-        switch (event) {
-          case PoolEvent.WITHDRAWN:
-            return {
-              ...newEvent,
-              amount: Number(fromWei(returnValues.amount.toString())),
-              destination: returnValues.sender,
-            }
-          case PoolEvent.OWNERSHIP_TRANSFERRED:
-            return {
-              ...newEvent,
-              previousOwner: returnValues.previousOwner,
-              newOwner: returnValues.newOwner,
-            }
-          case PoolEvent.BOUGHT_TICKETS:
-            return {
-              ...newEvent,
-              buyer: returnValues.sender,
-              tickets: returnValues.count.toNumber(),
-              total: Number(fromWei(returnValues.totalPrice.toString())),
-            }
-          case PoolEvent.POOL_LOCKED:
-          case PoolEvent.POOL_UNLOCKED:
-          case PoolEvent.POOL_COMPLETE:
-          default:
-            return newEvent
-        }
-      }),
-      'event',
-    ))
+    contract.getPastEvents(type, options).then(formatPastEvents)
 
   const _isOwner = (address: string) => isOwner().call({ from: address })
 

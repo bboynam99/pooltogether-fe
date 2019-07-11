@@ -2,13 +2,8 @@ import { get, startCase } from 'lodash'
 import React, { ChangeEvent, useEffect, useState } from 'react'
 
 import './App.css'
-import { ContractData, getContractData } from './contracts/contract.model'
-import {
-  PastPoolEvents, PoolEvent,
-  PoolInfo,
-  PoolInstance,
-  PoolState,
-} from './contracts/pool/PoolContract'
+import { getContractData } from './contracts/contract.model'
+import { PoolInstance, PastPoolEvents, PoolEvent, PoolState, PoolInfo } from './contracts/pool/pool.model'
 import { Purchases } from './contracts/pool/Purchases'
 import { Withdrawals } from './contracts/pool/Withdrawals'
 import { PoolManager } from './contracts/poolManager/PoolManager'
@@ -72,52 +67,6 @@ const App: React.FC = () => {
     return () => removeAccountsChanged(setAccounts)
   }, [])
 
-  useEffect(() => {
-    if (!accounts.length) return
-    getContractData(accounts).then(
-      ({
-        _isPoolManager,
-        _isPoolOwner,
-        _poolManagerContract,
-        _poolContract,
-        _tokenContract,
-        _winnings,
-        _allowance,
-        _entry,
-        _pool,
-        _poolInfo,
-        _poolEvents,
-        _poolManagerInfo,
-      }: ContractData) => {
-        setPoolManagerContract(_poolManagerContract)
-        setPoolContract(_poolContract)
-        setTokenContract(_tokenContract)
-
-        setIsPoolManager(_isPoolManager)
-        setIsPoolOwner(_isPoolOwner)
-        setPoolManagerInfo(_poolManagerInfo)
-
-        setPool(_pool)
-        setPoolInfo(_poolInfo)
-        setPoolEvents(_poolEvents)
-        setIsOpen(_poolInfo.poolState === PoolState.OPEN)
-        setIsLocked(_poolInfo.poolState === PoolState.LOCKED)
-        setIsUnlocked(_poolInfo.poolState === PoolState.UNLOCKED)
-        setIsComplete(_poolInfo.poolState === PoolState.COMPLETE)
-
-        setIsWinner(_poolInfo.winner.toLowerCase() === accounts[0].toLowerCase())
-        setBalance(_winnings - _entry.withdrawn)
-        setDeposited(_entry.amount)
-        setWithdrawn(_entry.withdrawn)
-        setWinnings(_winnings)
-        setAllowance(_allowance)
-        setEntry(_entry)
-      },
-    )
-  }, [accounts])
-
-  if (!poolManagerContract || !poolContract || !tokenContract) return loading
-
   const update = async (confirmationNum: number) => {
     if (confirmationNum > 1) return
     const {
@@ -158,6 +107,15 @@ const App: React.FC = () => {
     setAllowance(_allowance)
     setEntry(_entry)
   }
+
+  const updateEffectHandler = () => {
+    if (!accounts.length) return
+    update(1)
+  }
+
+  useEffect(updateEffectHandler, [accounts])
+
+  if (!poolManagerContract || !poolContract || !tokenContract) return loading
 
   const connect = () => tokenContract.approve(pool, accounts[0], update)
 
@@ -306,6 +264,11 @@ const App: React.FC = () => {
                   {isComplete && isWinner && balance === 0 && (
                     <p>Your winnings have been withdrawn. Thanks for playing!</p>
                   )}
+                  {isComplete && !isWinner && balance === 0 && (<div style={{textAlign: 'right'}}>
+                    <h1>No dice :(</h1>
+                    <p>Thanks for playing, and better luck next time!</p>
+                    <h3>Your deposit has been withdrawn</h3>
+                  </div>)}
                   {!isComplete && (
                     <div>
                       <strong>Allowance:</strong> {allowance} DAI
@@ -441,7 +404,7 @@ const App: React.FC = () => {
                         const winner =
                           showWinner && value === '0x0000000000000000000000000000000000000000'
                             ? 'TBA'
-                            : value
+                            : isWinner ? <strong>You :)</strong> : value
                         name = name === 'estimatedInterestFixedPoint18' ? 'estimatedInterest' : name
                         return (
                           <tr key={name.toString()}>
@@ -459,11 +422,8 @@ const App: React.FC = () => {
                 </table>
               </div>
             </div>
-            <hr />
-            <Purchases purchases={poolEvents ? poolEvents[PoolEvent.BOUGHT_TICKETS] : []} />
-            <hr />
+            <Purchases address={accounts[0]} purchases={poolEvents ? poolEvents[PoolEvent.BOUGHT_TICKETS] : []} />
             <Withdrawals withdrawals={poolEvents ? poolEvents[PoolEvent.WITHDRAWN] : []} />
-            <hr />
           </div>
 
           <div className="fns cell">

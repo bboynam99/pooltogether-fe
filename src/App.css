@@ -70,8 +70,10 @@ li {
 .pool-grid-container {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-gap: 10px;
+  /*grid-gap: 10px;*/
   grid-auto-rows: minmax(100px, auto);
+  border-bottom: 1px solid #555;
+  padding-bottom: 20px;
 }
 
 /*h3, h4 {*/
