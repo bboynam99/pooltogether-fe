@@ -1,5 +1,5 @@
 import { fromWei, getContract } from '../../web3'
-import { pick } from 'lodash'
+import { groupBy, pick } from 'lodash'
 import { allEventsOptions, OnConfirmationHandler, PoolEventReponse } from '../contract.model'
 import PoolContractJSON from './Pool.json'
 
@@ -131,15 +131,12 @@ export default (poolAddress: string): PoolInstance => {
 
   const _getPastEvents = (type: PoolEvent, options: any = allEventsOptions) => contract.getPastEvents(type, options)
 
+  const _getStats = () => _getPastEvents(PoolEvent.ALL).then(evts => groupBy(evts, 'event'))
+
   const _getPurchases = async () => {
-    const stuff = await _getPastEvents(PoolEvent.ALL)
+    const stuff = await _getStats()
     console.log(stuff)
-    return _getPastEvents(PoolEvent.BOUGHT_TICKETS).then((events: PoolEventReponse[]) => events.map(evt => ({
-      buyer: evt.returnValues.sender,
-      tickets: evt.returnValues.count.toNumber(),
-      total: Number(fromWei(evt.returnValues.totalPrice.toString())),
-      transactionHash: evt.transactionHash
-    })) )
+    return []
   }
 
   const _getWithdrawals = async () => {
