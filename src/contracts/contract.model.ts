@@ -1,5 +1,9 @@
 import { fromWei } from '../web3'
-import PoolContract, { PoolInfo, PoolInstance, PoolStats } from './pool/PoolContract'
+import PoolContract, {
+  PastPoolEvents,
+  PoolInfo,
+  PoolInstance,
+} from './pool/PoolContract'
 import PoolManagerContract, { PoolManagerInstance } from './poolManager/PoolManagerContract'
 import TokenContract, { TokenInstance } from './token/TokenContract'
 
@@ -19,21 +23,24 @@ export interface ContractData {
   _pool: string
   _poolManagerInfo: any
   _poolInfo: PoolInfo
-  _poolStats: PoolStats
+  _poolEvents: PastPoolEvents
 }
 
 export type OnConfirmationHandler = (confirmationNumber: number) => void
 
 export const allEventsOptions = {
   fromBlock: 0,
-  toBlock: 'latest'
+  toBlock: 'latest',
 }
 
 export interface PoolEventReponse {
   transactionHash: string
-  returnValues: any
+  event: string
+  returnValues: {
+    sender?: string
+    totalAmount?: number
+  }
 }
-
 
 const _poolManagerContract = PoolManagerContract()
 const _tokenContract = TokenContract()
@@ -41,6 +48,7 @@ const _tokenContract = TokenContract()
 export const getContractData = async (accounts: string[]): Promise<ContractData> => {
   if (!accounts) throw new Error('No accounts supplied')
   const _account = accounts[0]
+  console.log('account', _account)
 
   // Pool Manager
   const _poolManagerInfo = await _poolManagerContract.getInfo()
@@ -58,10 +66,7 @@ export const getContractData = async (accounts: string[]): Promise<ContractData>
   const allowance = await _tokenContract.allowance(_account, _poolManagerInfo._currentPool)
   const _balance = await _tokenContract.balanceOf(_account)
 
-  const _poolStats = {
-    purchases: await _poolContract.getPurchases(),
-    withdrawals: await _poolContract.getWithdrawals()
-  }
+  const _poolEvents = await _poolContract.getPastEvents()
 
   return {
     _poolContract,
@@ -79,6 +84,6 @@ export const getContractData = async (accounts: string[]): Promise<ContractData>
     _entry,
     _poolManagerInfo,
     _poolInfo,
-    _poolStats
+    _poolEvents,
   }
 }

@@ -9,12 +9,7 @@ export enum PoolEvent {
   POOL_LOCKED = 'PoolLocked',
   POOL_UNLOCKED = 'PoolUnlocked',
   POOL_COMPLETE = 'PoolComplete',
-  ALL = 'allEvents'
-}
-
-export interface PoolStats {
-  purchases: Purchase[]
-  withdrawals: Withdrawal[]
+  ALL = 'allEvents',
 }
 
 export enum PoolState {
@@ -51,18 +46,17 @@ export interface Withdrawal {
   transactionHash: string
 }
 
+export interface PastPoolEvents {
+  [PoolEvent.BOUGHT_TICKETS]: Purchase[]
+  [PoolEvent.WITHDRAWN]: Withdrawal[]
+}
+
 export interface PoolInstance {
-  buyTickets: (
-    numTix: number,
-    account: string,
-    callback: OnConfirmationHandler,
-  ) => Promise<void>
+  buyTickets: (numTix: number, account: string, callback: OnConfirmationHandler) => Promise<void>
   complete: (address: string, secret: string, callback: OnConfirmationHandler) => Promise<void>
   getEntry: (account: string) => Promise<any>
   getInfo: () => Promise<PoolInfo>
-  getPastEvents: (type: PoolEvent, options: any) => Promise<PoolEventReponse[]>
-  getPurchases: () => Promise<Purchase[]>
-  getWithdrawals: () => Promise<Withdrawal[]>
+  getPastEvents: (type?: PoolEvent, options?: any) => Promise<PastPoolEvents>
   isOwner: (address: string) => Promise<boolean>
   lock: (address: string, secretHash: string, callback: OnConfirmationHandler) => Promise<void>
   netWinnings: () => Promise<number>
@@ -129,25 +123,40 @@ export default (poolAddress: string): PoolInstance => {
         ]),
       )
 
-  const _getPastEvents = (type: PoolEvent, options: any = allEventsOptions) => contract.getPastEvents(type, options)
-
-  const _getStats = () => _getPastEvents(PoolEvent.ALL).then(evts => groupBy(evts, 'event'))
-
-  const _getPurchases = async () => {
-    const stuff = await _getStats()
-    console.log(stuff)
-    return []
-  }
-
-  const _getWithdrawals = async () => {
-    const events = await _getPastEvents(PoolEvent.POOL_LOCKED)
-    console.log(events)
-    return events.map(evt => ({
-      amount: Number(fromWei(evt.returnValues.amount.toString())),
-      destination: evt.returnValues.sender,
-      transactionHash: evt.transactionHash
-    }))
-  }
+  const _getPastEvents = (
+    type: PoolEvent = PoolEvent.ALL,
+    options: any = allEventsOptions,
+  ): Promise<any> =>
+    contract.getPastEvents(type, options).then((evts: PoolEventReponse[]) => {
+      const stuff = groupBy(
+        evts.map(evt => {
+          const { returnValues, transactionHash } = evt
+          console.log(returnValues)
+          const newEvent = {
+            event: returnValues.event,
+            transactionHash: transactionHash,
+          }
+          switch (returnValues.event) {
+            case PoolEvent.WITHDRAWN:
+              return {
+                ...newEvent,
+                amount: Number(fromWei(returnValues.amount.toString())),
+                destination: returnValues.sender,
+              }
+            case PoolEvent.BOUGHT_TICKETS:
+            default:
+              return {
+                ...newEvent,
+                buyer: returnValues.sender,
+                tickets: returnValues.count.toNumber(),
+                total: Number(fromWei(returnValues.totalPrice.toString())),
+              }
+          }
+        }),
+        'event',
+      )
+      return stuff
+    })
 
   const _isOwner = (address: string) => isOwner().call({ from: address })
 
@@ -183,8 +192,6 @@ export default (poolAddress: string): PoolInstance => {
     getEntry: _getEntry,
     getInfo: _getInfo,
     getPastEvents: _getPastEvents,
-    getPurchases: _getPurchases,
-    getWithdrawals: _getWithdrawals,
     isOwner: _isOwner,
     lock: _lock,
     methodDocs: _methodDocs,
