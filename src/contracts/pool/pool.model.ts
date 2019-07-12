@@ -110,7 +110,6 @@ const groupPurchases = (group: any) => {
 }
 
 export const formatPastEvents = (poolAddress: string, events: PoolEventResponse[]): any => {
-  console.log(events)
   let grouped: any = groupBy(
     events.filter(evt => evt.address === poolAddress).map(evt => {
       const { event, returnValues, transactionHash } = evt
