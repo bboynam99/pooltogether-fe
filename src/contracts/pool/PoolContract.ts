@@ -64,8 +64,7 @@ export default (poolAddress: string): PoolInstance => {
   const _getPastEvents = (
     type: PoolEvent = PoolEvent.ALL,
     options: any = allEventsOptions,
-  ): Promise<any> =>
-    contract.getPastEvents(type, options).then(formatPastEvents)
+  ): Promise<any> => contract.getPastEvents(type, options).then(formatPastEvents)
 
   const _isOwner = (address: string) => isOwner().call({ from: address })
 

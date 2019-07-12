@@ -150,7 +150,7 @@ export const formatPastEvents = (events: PoolEventResponse[]): any => {
     if (!group.length || PoolEvent.BOUGHT_TICKETS !== group[0].event) return group
     grouped = {
       ...grouped,
-      [PoolEvent.BOUGHT_TICKETS]: groupPurchases(group)
+      [PoolEvent.BOUGHT_TICKETS]: groupPurchases(group),
     }
   })
   return grouped

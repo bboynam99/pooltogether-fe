@@ -22,9 +22,11 @@ export const PoolManager: React.FC<PoolManagerProps> = ({
       <div style={{ textAlign: 'center', marginTop: 10, marginBottom: 20 }}>
         <button
           disabled={!currentPoolComplete}
-          onClick={() => createPool(accounts[0], (confirmationNumber: number = 1) => {
-            onConfirmation(confirmationNumber)
-          })}
+          onClick={() =>
+            createPool(accounts[0], (confirmationNumber: number = 1) => {
+              onConfirmation(confirmationNumber)
+            })
+          }
           style={{ width: '100%' }}
         >
           Create Pool

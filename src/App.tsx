@@ -1,9 +1,16 @@
 import { get, startCase } from 'lodash'
-import React, { ChangeEvent, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 import './App.css'
 import { getContractData } from './contracts/contract.model'
-import { PoolInstance, PastPoolEvents, PoolEvent, PoolState, PoolInfo } from './contracts/pool/pool.model'
+import { Entry } from './contracts/entry/Entry'
+import {
+  PoolInstance,
+  PastPoolEvents,
+  PoolEvent,
+  PoolState,
+  PoolInfo,
+} from './contracts/pool/pool.model'
 import { Purchases } from './contracts/pool/Purchases'
 import { Withdrawals } from './contracts/pool/Withdrawals'
 import { PoolManager } from './contracts/poolManager/PoolManager'
@@ -23,89 +30,45 @@ const secret: any = asciiToHex('test_pool')
 const secretHash: string = soliditySha3(abiEncodeSecret(secret))
 const loading = <div style={{ margin: 20 }}>Loading...</div>
 
+interface AppState {
+  poolContract: PoolInstance
+  poolManagerContract: PoolManagerInstance
+  tokenContract: TokenInstance
+  isPoolManager: boolean
+  poolManagerInfo: any
+  pool: string
+  isPoolOwner: boolean
+  poolInfo: PoolInfo
+  poolEvents: PastPoolEvents
+  isWinner: boolean
+  isOpen: boolean
+  isLocked: boolean
+  isUnlocked: boolean
+  isComplete: boolean
+  allowance: number
+  balance: number
+  entry: any
+  withdrawn: number
+  winnings: number
+}
+
 const App: React.FC = () => {
   const [accounts, setAccounts] = useState<string[]>([])
-
-  // contracts
-  const [poolContract, setPoolContract] = useState<PoolInstance>()
-  const [poolManagerContract, setPoolManagerContract] = useState<PoolManagerInstance>()
-  const [tokenContract, setTokenContract] = useState<TokenInstance>()
-
-  // pool manager
-  const [isPoolManager, setIsPoolManager] = useState(false)
-  const [poolManagerInfo, setPoolManagerInfo] = useState<any>()
-
-  // pool
-  const [pool, setPool] = useState()
-  const [isPoolOwner, setIsPoolOwner] = useState(false)
-  const [poolInfo, setPoolInfo] = useState<PoolInfo>()
-  const [poolEvents, setPoolEvents] = useState<PastPoolEvents>()
-
-  // player
-  const [isWinner, setIsWinner] = useState(false)
-  const [balance, setBalance] = useState()
-  const [allowance, setAllowance] = useState()
-  const [deposited, setDeposited] = useState()
-  const [withdrawn, setWithdrawn] = useState()
-  const [entry, setEntry] = useState()
-  const [winnings, setWinnings] = useState()
-  const [numTixToBuy, setNumTixToBuy] = useState(1)
-
-  // current pool state
-  const [isOpen, setIsOpen] = useState(false)
-  const [isLocked, setIsLocked] = useState(false)
-  const [isUnlocked, setIsUnlocked] = useState(false)
-  const [isComplete, setIsComplete] = useState(false)
+  const [appState, setAppState] = useState<AppState | null>()
 
   // show/hide method info
   const [showPmc, setShowPmc] = useState()
   const [showPc, setShowPc] = useState()
 
   useEffect(() => {
-    enable().then((_accounts: string[]) => setAccounts(_accounts))
+    enable().then(setAccounts)
     onAccountsChanged(setAccounts)
     return () => removeAccountsChanged(setAccounts)
   }, [])
 
-  const update = async (confirmationNum: number) => {
+  const update = (confirmationNum: number) => {
     if (confirmationNum > 1) return
-    const {
-      _allowance,
-      _entry,
-      _isPoolManager,
-      _isPoolOwner,
-      _pool,
-      _poolContract,
-      _poolManagerContract,
-      _poolInfo,
-      _poolEvents,
-      _poolManagerInfo,
-      _tokenContract,
-      _winnings,
-    } = await getContractData(accounts)
-    setPoolManagerContract(_poolManagerContract)
-    setPoolContract(_poolContract)
-    setTokenContract(_tokenContract)
-
-    setIsPoolManager(_isPoolManager)
-    setIsPoolOwner(_isPoolOwner)
-    setPoolManagerInfo(_poolManagerInfo)
-
-    setPool(_pool)
-    setPoolInfo(_poolInfo)
-    setPoolEvents(_poolEvents)
-    setIsOpen(_poolInfo.poolState === PoolState.OPEN)
-    setIsLocked(_poolInfo.poolState === PoolState.LOCKED)
-    setIsUnlocked(_poolInfo.poolState === PoolState.UNLOCKED)
-    setIsComplete(_poolInfo.poolState === PoolState.COMPLETE)
-
-    setIsWinner(_poolInfo.winner.toLowerCase() === accounts[0].toLowerCase())
-    setBalance(_winnings - _entry.withdrawn)
-    setDeposited(_entry.amount)
-    setWithdrawn(_entry.withdrawn)
-    setWinnings(_winnings)
-    setAllowance(_allowance)
-    setEntry(_entry)
+    getContractData(accounts).then(setAppState)
   }
 
   const updateEffectHandler = () => {
@@ -115,21 +78,29 @@ const App: React.FC = () => {
 
   useEffect(updateEffectHandler, [accounts])
 
-  if (!poolManagerContract || !poolContract || !tokenContract || !poolEvents) return loading
+  if (!appState) return loading
 
-  const connect = () => tokenContract.approve(pool, accounts[0], update)
+  const {
+    poolContract,
+    poolManagerContract,
+    tokenContract,
+    isPoolManager,
+    poolManagerInfo,
+    pool,
+    isPoolOwner,
+    poolInfo,
+    poolEvents,
+    isWinner,
+    isOpen,
+    isLocked,
+    isUnlocked,
+    isComplete,
+    allowance,
+    balance,
+    entry,
+    winnings,
+  } = appState
 
-  const decreaseAllowance = () => tokenContract.decreaseAllowance(pool, accounts[0], update)
-
-  const buy = async () => {
-    if (!poolContract || allowance <= 0) return
-    poolContract.buyTickets(numTixToBuy, accounts[0], (confirmationNumber: number) => {
-      if (confirmationNumber === 1) setNumTixToBuy(1)
-      update(confirmationNumber)
-    })
-  }
-
-  const withdraw = () => poolContract && deposited > 0 && poolContract.withdraw(accounts[0], update)
 
   const lock = () => poolInfo && isPoolOwner && poolContract.lock(accounts[0], secretHash, update)
 
@@ -182,131 +153,7 @@ const App: React.FC = () => {
             <h4>Previous Pools</h4>
           </div>
 
-          {entry && (
-            <div className="entry cell">
-              <h2>Your Pooltogether</h2>
-
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <div>
-                  <table>
-                    <tbody>
-                      <tr>
-                        <td>
-                          <strong>Address:</strong>
-                        </td>
-                        <td>{accounts[0]}</td>
-                      </tr>
-                      <tr>
-                        <td>
-                          <strong>Tickets:</strong>
-                        </td>
-                        <td>{entry.ticketCount.toNumber()}</td>
-                      </tr>
-                      <tr>
-                        <td>
-                          <strong>Deposit:</strong>
-                        </td>
-                        <td>{fromWei(deposited.toString())} DAI</td>
-                      </tr>
-                      <tr>
-                        <td>
-                          <strong>Winnings:</strong>
-                        </td>
-                        <td>{fromWei(String(winnings - deposited))} DAI</td>
-                      </tr>
-                      <tr>
-                        <td>
-                          <strong>Withdrawn:</strong>
-                        </td>
-                        <td>{fromWei(withdrawn.toString())} DAI</td>
-                      </tr>
-                      <tr>
-                        <td>
-                          <strong>Balance:</strong>
-                        </td>
-                        <td>{fromWei(String(balance))} DAI</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div
-                  style={{
-                    minHeight: 200,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-end',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  {isWinner && (
-                    <div>
-                      <h1 style={{ textAlign: 'right' }}>Winner, winner, chicken dinner!</h1>
-                      <p
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'flex-end',
-                        }}
-                      >
-                        <span>You won</span>
-                        <strong style={{ fontSize: 38, marginLeft: 10 }}>
-                          {fromWei(String(winnings - deposited))} DAI
-                        </strong>
-                      </p>
-                    </div>
-                  )}
-                  {isComplete && isWinner && balance === 0 && (
-                    <p>Your winnings have been withdrawn. Thanks for playing!</p>
-                  )}
-                  {isComplete && !isWinner && balance === 0 && (<div style={{textAlign: 'right'}}>
-                    <h1>No dice :(</h1>
-                    <p>Thanks for playing, and better luck next time!</p>
-                    <h3>Your deposit has been withdrawn</h3>
-                  </div>)}
-                  {!isComplete && (
-                    <div>
-                      <strong>Allowance:</strong> {allowance} DAI
-                    </div>
-                  )}
-                  {allowance <= 0 && !isComplete ? (
-                    <button onClick={connect}>Connect to Pool</button>
-                  ) : (
-                    <div>
-                      {!isComplete && (
-                        <input
-                          type="number"
-                          min={1}
-                          value={numTixToBuy}
-                          onChange={(evt: ChangeEvent<HTMLInputElement>) =>
-                            setNumTixToBuy(Number(evt.target.value))
-                          }
-                        />
-                      )}
-                      <div className="actions">
-                        {isComplete && balance > 0 && <button onClick={withdraw}>Withdraw</button>}
-                        {isOpen && allowance > 0 && (
-                          <button onClick={buy}>
-                            Buy {numTixToBuy === 1 ? 'a' : numTixToBuy} Ticket
-                            {numTixToBuy > 1 && 's'}
-                          </button>
-                        )}
-                        {!isComplete && (
-                          <button onClick={decreaseAllowance}>Decrease Allowance</button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <hr />
-            </div>
-          )}
+          <Entry address={accounts[0]} allowance={allowance} balance={balance} entry={entry} isComplete={isComplete} isOpen={isOpen} isWinner={isWinner} pool={pool} poolContract={poolContract} tokenContract={tokenContract} update={update} winnings={winnings}/>
 
           <div className="poolInfo cell">
             <div
@@ -402,9 +249,13 @@ const App: React.FC = () => {
                         const convert = ['estimatedInterestFixedPoint18'].includes(name)
                         const showWinner = name === 'winner'
                         const winner =
-                          showWinner && value === '0x0000000000000000000000000000000000000000'
-                            ? 'TBA'
-                            : isWinner ? <strong>You :)</strong> : value
+                          showWinner && value === '0x0000000000000000000000000000000000000000' ? (
+                            'TBA'
+                          ) : isWinner ? (
+                            <strong>You :)</strong>
+                          ) : (
+                            value
+                          )
                         name = name === 'estimatedInterestFixedPoint18' ? 'estimatedInterest' : name
                         return (
                           <tr key={name.toString()}>
@@ -457,7 +308,9 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-      ) : loading}
+      ) : (
+        loading
+      )}
     </div>
   )
 }

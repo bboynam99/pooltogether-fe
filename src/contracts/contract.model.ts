@@ -1,26 +1,32 @@
 import { fromWei } from '../web3'
-import { PastPoolEvents, PoolInfo, PoolInstance } from './pool/pool.model'
+import { PastPoolEvents, PoolInfo, PoolInstance, PoolState } from './pool/pool.model'
 import PoolContract from './pool/PoolContract'
 import PoolManagerContract, { PoolManagerInstance } from './poolManager/PoolManagerContract'
 import TokenContract, { TokenInstance } from './token/TokenContract'
 
 export interface ContractData {
-  _isPoolManager: boolean
-  _isPoolOwner: boolean
-  _poolContract: PoolInstance
-  _poolManagerContract: PoolManagerInstance
-  _tokenContract: TokenInstance
-  _netWinnings: number
-  _winnings: number
-  _balance: number
-  _allowance: number
-  _entry: any
-  _lockDuration: number
-  _openDuration: number
-  _pool: string
-  _poolManagerInfo: any
-  _poolInfo: PoolInfo
-  _poolEvents: PastPoolEvents
+  isPoolManager: boolean
+  isPoolOwner: boolean
+  poolContract: PoolInstance
+  poolManagerContract: PoolManagerInstance
+  tokenContract: TokenInstance
+  netWinnings: number
+  winnings: number
+  balance: number
+  allowance: number
+  entry: any
+  lockDuration: number
+  openDuration: number
+  pool: string
+  poolManagerInfo: any
+  poolInfo: PoolInfo
+  poolEvents: PastPoolEvents
+  withdrawn: number
+  isOpen: boolean
+  isLocked: boolean
+  isUnlocked: boolean
+  isComplete: boolean
+  isWinner: boolean
 }
 
 export type OnConfirmationHandler = (confirmationNumber: number) => void
@@ -30,8 +36,8 @@ export const allEventsOptions = {
   toBlock: 'latest',
 }
 
-const _poolManagerContract = PoolManagerContract()
 const _tokenContract = TokenContract()
+const _poolManagerContract = PoolManagerContract()
 
 export const getContractData = async (accounts: string[]): Promise<ContractData> => {
   if (!accounts) throw new Error('No accounts supplied')
@@ -49,27 +55,33 @@ export const getContractData = async (accounts: string[]): Promise<ContractData>
   const _entry = await _poolContract.getEntry(_account)
   const _netWinnings = await _poolContract.netWinnings()
   const _winnings = await _poolContract.winnings(_account)
+  const _balance = _winnings - _entry.withdrawn
+
   // Token
   const allowance = await _tokenContract.allowance(_account, _poolManagerInfo._currentPool)
-  const _balance = await _tokenContract.balanceOf(_account)
 
-  // console.log(_poolEvents)
   return {
-    _poolContract,
-    _poolManagerContract,
-    _tokenContract,
-    _isPoolManager,
-    _isPoolOwner,
-    _balance,
-    _netWinnings,
-    _winnings,
-    _allowance: Number(fromWei(allowance.toString())),
-    _lockDuration: _poolManagerInfo._lockDurationInBlocks,
-    _openDuration: _poolManagerInfo._openDurationInBlocks,
-    _pool: _poolManagerInfo._currentPool,
-    _entry,
-    _poolManagerInfo,
-    _poolInfo,
-    _poolEvents,
+    poolContract: _poolContract,
+    poolManagerContract: _poolManagerContract,
+    tokenContract: _tokenContract,
+    isPoolManager: _isPoolManager,
+    isPoolOwner: _isPoolOwner,
+    balance: _balance,
+    netWinnings: _netWinnings,
+    winnings: _winnings,
+    allowance: Number(fromWei(allowance.toString())),
+    lockDuration: _poolManagerInfo._lockDurationInBlocks,
+    openDuration: _poolManagerInfo._openDurationInBlocks,
+    pool: _poolManagerInfo._currentPool,
+    entry: _entry,
+    poolManagerInfo: _poolManagerInfo,
+    poolInfo: _poolInfo,
+    poolEvents: _poolEvents,
+    withdrawn: _entry.withdrawn,
+    isOpen: _poolInfo.poolState === PoolState.OPEN,
+    isLocked: _poolInfo.poolState === PoolState.LOCKED,
+    isUnlocked: _poolInfo.poolState === PoolState.UNLOCKED,
+    isComplete: _poolInfo.poolState === PoolState.COMPLETE,
+    isWinner: _poolInfo.winner.toLowerCase() === accounts[0].toLowerCase()
   }
 }
