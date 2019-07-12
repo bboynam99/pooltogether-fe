@@ -60,7 +60,7 @@ export const Purchases: React.FC<PurchasesProps> = ({ address, purchases }: Purc
             </div>
 
             <h4 style={{ marginBottom: 10 }}>Transactions</h4>
-            {p.purchases.map(purchase => (
+            {p.purchases.map((purchase, j) => (
               <div
                 key={purchase.hash}
                 style={{
@@ -69,7 +69,7 @@ export const Purchases: React.FC<PurchasesProps> = ({ address, purchases }: Purc
                   justifyContent: 'space-between',
                   margin: '5px 0',
                   paddingBottom: 5,
-                  borderBottom: '1px dotted rgba(0, 0, 0, 0.2)',
+                  borderBottom: j === p.purchases.length - 1 ? '' : `1px dotted rgba(0, 0, 0, 0.2)`,
                 }}
               >
                 <a

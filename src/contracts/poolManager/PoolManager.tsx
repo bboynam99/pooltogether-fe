@@ -1,6 +1,6 @@
 import React from 'react'
 import { OnConfirmationHandler } from '../contract.model'
-import PoolManagerContract from './PoolManagerContract'
+import { PoolManagerContract } from './PoolManagerContract'
 
 interface PoolManagerProps {
   accounts: string[]

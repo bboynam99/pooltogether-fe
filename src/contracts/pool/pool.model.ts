@@ -53,6 +53,7 @@ export interface Withdrawal {
 }
 
 export interface PoolEventResponse {
+  address: string
   transactionHash: string
   event: string
   returnValues: {
@@ -108,9 +109,10 @@ const groupPurchases = (group: any) => {
   })
 }
 
-export const formatPastEvents = (events: PoolEventResponse[]): any => {
+export const formatPastEvents = (poolAddress: string, events: PoolEventResponse[]): any => {
+  console.log(events)
   let grouped: any = groupBy(
-    events.map(evt => {
+    events.filter(evt => evt.address === poolAddress).map(evt => {
       const { event, returnValues, transactionHash } = evt
       const newEvent = {
         event,

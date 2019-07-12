@@ -1,7 +1,8 @@
 import { fromWei } from '../web3'
 import { PastPoolEvents, PoolInfo, PoolInstance, PoolState } from './pool/pool.model'
 import PoolContract from './pool/PoolContract'
-import PoolManagerContract, { PoolManagerInstance } from './poolManager/PoolManagerContract'
+import { PoolManagerInfo, PoolManagerInstance } from './poolManager/poolManager.model'
+import { PoolManagerContract } from './poolManager/PoolManagerContract'
 import TokenContract, { TokenInstance } from './token/TokenContract'
 
 export interface ContractData {
@@ -18,7 +19,7 @@ export interface ContractData {
   lockDuration: number
   openDuration: number
   pool: string
-  poolManagerInfo: any
+  poolManagerInfo: PoolManagerInfo
   poolInfo: PoolInfo
   poolEvents: PastPoolEvents
   withdrawn: number
@@ -37,13 +38,13 @@ export const allEventsOptions = {
 }
 
 const _tokenContract = TokenContract()
-const _poolManagerContract = PoolManagerContract()
 
 export const getContractData = async (accounts: string[]): Promise<ContractData> => {
   if (!accounts) throw new Error('No accounts supplied')
   const _account = accounts[0]
 
   // Pool Manager
+  const _poolManagerContract = PoolManagerContract()
   const _poolManagerInfo = await _poolManagerContract.getInfo()
   const _isPoolManager = await _poolManagerContract.isManager(_account)
 
