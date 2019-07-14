@@ -1,10 +1,5 @@
-import { OnConfirmationHandler } from '../contract.model'
-
-export interface ContractEventResponse {
-  address: string
-  transactionHash: string
-  event: string
-}
+import { ContractEventResponse, OnConfirmationHandler } from '../contract.model'
+import { PoolInstance } from '../pool/pool.model'
 
 export enum PoolManagerEvent {
   ALL = 'allEvents',
@@ -17,48 +12,31 @@ export enum PoolManagerEvent {
   TICKET_PRICE_CHANGED = 'TicketPriceChanged',
 }
 
-export interface PoolManagerEventResponse extends ContractEventResponse {
-  event: PoolManagerEvent
+export interface PoolManagerOwnershipChangedEvent extends ContractEventResponse {
+  newOwner: string
+  previousOwner: string
 }
 
-export interface PoolManagerOwnershipChangedEvent extends PoolManagerEventResponse {
-  returnValues: {
-    newOwner: string
-    previousOwner: string
-  }
+export interface PoolCreatedEvent extends ContractEventResponse {
+  number: number
+  pool: string
 }
 
-export interface PoolCreatedEvent extends PoolManagerEventResponse {
-  returnValues: {
-    number: number
-    pool: string
-  }
+export interface PoolParamDurationChangedEvent extends ContractEventResponse {
+  durationInBlocks: number
 }
 
-export interface PoolParamDurationChangedEvent extends PoolManagerEventResponse {
-  returnValues: {
-    durationInBlocks?: number
-  }
+export interface TicketPriceChangedEvent extends ContractEventResponse {
+  ticketPrice: number
 }
 
-export interface TicketPriceChangedEvent extends PoolManagerEventResponse {
-  returnValues: {
-    ticketPrice: number
-  }
+export interface AllowLockAnyTimeChangedEvent extends ContractEventResponse {
+  allowLockAnytime: boolean
 }
 
-export interface AllowLockAnyTimeChangedEvent extends PoolManagerEventResponse {
-  returnValues: {
-    allowLockAnytime: boolean
-  }
+export interface FeeFractionChangedEvent extends ContractEventResponse {
+  feeFractionFixedPoint18: number
 }
-
-export interface FeeFractionChangedEvent extends PoolManagerEventResponse {
-  returnValues: {
-    feeFractionFixedPoint18: number
-  }
-}
-
 
 export interface PastPoolManagerEvents {
   [PoolManagerEvent.LOCK_DURATION_CHANGED]: PoolParamDurationChangedEvent[]
@@ -81,7 +59,11 @@ export interface PoolManagerInfo {
 
 export interface PoolManagerInstance {
   createPool: (account: string, callback: OnConfirmationHandler) => Promise<void>
+  currentPool: PoolInstance
   isManager: (account: string) => Promise<boolean>
   getInfo: () => Promise<PoolManagerInfo>
+  getPastEvents: () => Promise<PastPoolManagerEvents>
   methodDocs: { [key: string]: { notice: string } | string }
+  pastEvents: PastPoolManagerEvents
+  pools: { [key: string]: PoolInstance }
 }

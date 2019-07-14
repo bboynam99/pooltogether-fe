@@ -1,16 +1,8 @@
 import { fromWei } from '../../web3'
-import { OnConfirmationHandler } from '../contract.model'
-import { groupBy, sumBy } from 'lodash'
-
-export enum PoolEvent {
-  ALL = 'allEvents',
-  BOUGHT_TICKETS = 'BoughtTickets',
-  POOL_LOCKED = 'PoolLocked',
-  POOL_UNLOCKED = 'PoolUnlocked',
-  POOL_COMPLETE = 'PoolComplete',
-  OWNERSHIP_TRANSFERRED = 'OwnershipTransferred',
-  WITHDRAWN = 'Withdrawn',
-}
+import { ContractEventResponse, OnConfirmationHandler } from '../contract.model'
+import { sumBy } from 'lodash'
+import { EntryInfo } from '../entry/entry.model'
+import { EventData } from 'web3-eth-contract'
 
 export enum PoolState {
   OPEN,
@@ -52,107 +44,129 @@ export interface Withdrawal {
   transactionHash: string
 }
 
-export interface PoolEventResponse {
-  address: string
-  transactionHash: string
-  event: string
-  returnValues: {
-    amount?: any
-    count?: any
-    newOwner?: string
-    previousOwner?: string
-    sender?: string
-    totalAmount?: any
-    totalPrice?: any
-  }
+export enum PoolEvent {
+  ALL = 'allEvents',
+  BOUGHT_TICKETS = 'BoughtTickets',
+  POOL_LOCKED = 'PoolLocked',
+  POOL_UNLOCKED = 'PoolUnlocked',
+  POOL_COMPLETE = 'PoolComplete',
+  OWNERSHIP_TRANSFERRED = 'OwnershipTransferred',
+  WITHDRAWN = 'Withdrawn',
+}
+
+export interface BoughtTicketsEvent extends ContractEventResponse {
+  buyer: string
+  tickets: number
+  total: number
+}
+
+export interface WithdrawnEvent extends ContractEventResponse {
+  amount: number
+  destination: string
+}
+
+export interface OwnershipTransferredEvent extends ContractEventResponse {
+  previousOwner: string
+  newOwner: string
 }
 
 export interface PastPoolEvents {
   [PoolEvent.BOUGHT_TICKETS]: Purchase[]
   [PoolEvent.WITHDRAWN]: Withdrawal[]
-  [PoolEvent.POOL_LOCKED]: any[]
-  [PoolEvent.POOL_UNLOCKED]: any[]
-  [PoolEvent.POOL_COMPLETE]: any[]
-  [PoolEvent.OWNERSHIP_TRANSFERRED]: any[]
+  [PoolEvent.POOL_LOCKED]: ContractEventResponse[]
+  [PoolEvent.POOL_UNLOCKED]: ContractEventResponse[]
+  [PoolEvent.POOL_COMPLETE]: ContractEventResponse[]
+  [PoolEvent.OWNERSHIP_TRANSFERRED]: OwnershipTransferredEvent[]
 }
 
 export interface PoolInstance {
+  address: string
   buyTickets: (numTix: number, account: string, callback: OnConfirmationHandler) => Promise<void>
   complete: (address: string, secret: string, callback: OnConfirmationHandler) => Promise<void>
-  getEntry: (account: string) => Promise<any>
+  getEntry: (account: string) => Promise<EntryInfo>
   getInfo: () => Promise<PoolInfo>
-  getPastEvents: (type?: PoolEvent, options?: any) => Promise<PastPoolEvents>
+  getPastEvents: (type?: PoolEvent, options?: any) => Promise<EventData[]>
+  info: PoolInfo
   isOwner: (address: string) => Promise<boolean>
   lock: (address: string, secretHash: string, callback: OnConfirmationHandler) => Promise<void>
+  methodDocs: { [key: string]: { notice: string } | string }
   netWinnings: () => Promise<number>
+  owner: string
+  pastEvents: PastPoolEvents
+  playerBalance: number
   unlock: (address: string, callback: OnConfirmationHandler) => Promise<void>
   winnings: (account: string) => Promise<number>
   withdraw: (account: string, callback: OnConfirmationHandler) => Promise<void>
-  methodDocs: { [key: string]: { notice: string } | string }
 }
 
-const groupPurchases = (group: any) => {
-  const byBuyer = groupBy(group, 'buyer')
-  return Object.keys(byBuyer).map(address => {
-    const txs = byBuyer[address]
-    return {
-      event: PoolEvent.BOUGHT_TICKETS,
-      purchases: txs.map(tx => ({
-        hash: tx.transactionHash,
-        tickets: tx.tickets,
-        total: tx.total,
-      })),
-      buyer: address,
-      tickets: sumBy(txs, 'tickets'),
-      total: sumBy(txs, 'total'),
-    }
-  })
-}
-
-export const formatPastEvents = (poolAddress: string, events: PoolEventResponse[]): any => {
-  let grouped: any = groupBy(
-    events.filter(evt => evt.address === poolAddress).map(evt => {
-      const { event, returnValues, transactionHash } = evt
-      const newEvent = {
-        event,
-        transactionHash: transactionHash,
-      }
-      switch (event) {
-        case PoolEvent.BOUGHT_TICKETS:
-          return {
-            ...newEvent,
-            buyer: returnValues.sender,
-            tickets: returnValues.count.toNumber(),
-            total: Number(fromWei(returnValues.totalPrice.toString())),
-          }
-        case PoolEvent.WITHDRAWN:
-          return {
-            ...newEvent,
-            amount: Number(fromWei(returnValues.amount.toString())),
-            destination: returnValues.sender,
-          }
-        case PoolEvent.OWNERSHIP_TRANSFERRED:
-          return {
-            ...newEvent,
-            previousOwner: returnValues.previousOwner,
-            newOwner: returnValues.newOwner,
-          }
-        case PoolEvent.POOL_LOCKED:
-        case PoolEvent.POOL_UNLOCKED:
-        case PoolEvent.POOL_COMPLETE:
-        default:
-          return newEvent
-      }
-    }),
-    'event',
+const formatPurchases = ({ address, event, returnValues, transactionHash }: EventData, pastEvents: PastPoolEvents) => {
+  const newEvent = {
+    address,
+    event,
+    transactionHash: transactionHash,
+  }
+  const ticketsAndTotal = {
+    tickets: returnValues.count.toNumber(),
+    total: Number(fromWei(returnValues.totalPrice.toString())),
+  }
+  const existingPurchase = pastEvents[PoolEvent.BOUGHT_TICKETS].find(
+    pastEvent => returnValues.sender === pastEvent.buyer,
   )
-  Object.keys(grouped).forEach(groupName => {
-    const group = grouped[groupName]
-    if (!group.length || PoolEvent.BOUGHT_TICKETS !== group[0].event) return group
-    grouped = {
-      ...grouped,
-      [PoolEvent.BOUGHT_TICKETS]: groupPurchases(group),
-    }
-  })
-  return grouped
+  if (existingPurchase) {
+    existingPurchase.purchases.push({
+      hash: transactionHash,
+      ...ticketsAndTotal,
+    })
+    existingPurchase.tickets = sumBy(existingPurchase.purchases, 'tickets')
+    existingPurchase.total = sumBy(existingPurchase.purchases, 'total')
+  } else {
+    pastEvents[PoolEvent.BOUGHT_TICKETS].push({
+      ...newEvent,
+      purchases: [
+        {
+          hash: transactionHash,
+          ...ticketsAndTotal
+        },
+      ],
+      buyer: returnValues.sender,
+      ...ticketsAndTotal
+    })
+  }
+}
+
+export const updatePastEvents = (evt: EventData, pastEvents: PastPoolEvents): PastPoolEvents => {
+  const { event, returnValues, transactionHash } = evt
+  const _updated = {...pastEvents}
+  const newEvent = {
+    address: evt.address,
+    event,
+    transactionHash: transactionHash,
+  }
+  switch (event) {
+    case PoolEvent.BOUGHT_TICKETS:
+      formatPurchases(evt, _updated)
+      break
+    case PoolEvent.WITHDRAWN:
+      pastEvents[event].push({
+        ...newEvent,
+        amount: Number(fromWei(returnValues.amount.toString())),
+        destination: returnValues.sender,
+      })
+      break;
+    case PoolEvent.OWNERSHIP_TRANSFERRED:
+      pastEvents[event].push({
+        ...newEvent,
+        previousOwner: returnValues.previousOwner,
+        newOwner: returnValues.newOwner,
+      })
+      break;
+    case PoolEvent.POOL_LOCKED:
+    case PoolEvent.POOL_UNLOCKED:
+    case PoolEvent.POOL_COMPLETE:
+      pastEvents[event].push(newEvent)
+      break
+    default:
+      break
+  }
+  return _updated
 }

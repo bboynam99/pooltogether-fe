@@ -1,6 +1,8 @@
 import React from 'react'
-import { Purchase } from './pool.model'
 import { sumBy } from 'lodash'
+import { EtherscanLink } from '../../components/EtherscanLink'
+import { Purchase } from './pool.model'
+import './pool.scss'
 
 interface PurchasesProps {
   address: string
@@ -15,7 +17,7 @@ export const Purchases: React.FC<PurchasesProps> = ({ address, purchases }: Purc
         <strong>Total deposited:</strong> {sumBy(purchases, 'total')} DAI
       </span>
     </div>
-    {purchases ? (
+    {purchases.length ? (
       <div
         style={{
           display: 'flex',
@@ -42,18 +44,14 @@ export const Purchases: React.FC<PurchasesProps> = ({ address, purchases }: Purc
         {purchases.map((p, i) => (
           <div
             key={p.buyer}
-            style={{
-              padding: '20px 10px',
-              borderBottom: '1px solid #555',
-              backgroundColor: i % 2 ? 'rgba(100, 100, 100, 0.1)' : 'rgba(100, 100, 100, 0.05)',
-            }}
+            className="row purchase"
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <strong>{p.buyer}</strong>{' '}
-                {address.toLowerCase() === p.buyer.toLowerCase() && "(that's you, that is!)"}
+                <EtherscanLink target={p.buyer} type="address" />
+                <span>{address.toLowerCase() === p.buyer.toLowerCase() && "(that's you, that is!)"}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
                 <div>{p.tickets}</div>
                 <div style={{ width: 100, marginLeft: 10, textAlign: 'right' }}>{p.total} DAI</div>
               </div>
@@ -72,13 +70,7 @@ export const Purchases: React.FC<PurchasesProps> = ({ address, purchases }: Purc
                   borderBottom: j === p.purchases.length - 1 ? '' : `1px dotted rgba(0, 0, 0, 0.2)`,
                 }}
               >
-                <a
-                  style={{ textDecoration: 'none' }}
-                  href={`https://etherscan.io/tx/${purchase.hash}`}
-                  title="view transaction on Etherscan.io"
-                >
-                  {purchase.hash}
-                </a>
+                <EtherscanLink target={purchase.hash} type="tx" />
                 <div
                   style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end' }}
                 >

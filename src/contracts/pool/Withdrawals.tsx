@@ -1,7 +1,9 @@
 import React from 'react'
-import { FiExternalLink } from 'react-icons/fi'
+import { EtherscanLink } from '../../components/EtherscanLink'
 import { Withdrawal } from './pool.model'
 import { sumBy } from 'lodash'
+
+import './pool.scss'
 
 interface WithdrawalsProps {
   withdrawals: Withdrawal[]
@@ -15,7 +17,7 @@ export const Withdrawals: React.FC<WithdrawalsProps> = ({ withdrawals }: Withdra
         <strong>Total withdrawn:</strong> {sumBy(withdrawals, 'amount')} DAI
       </span>
     </div>
-    {withdrawals ? (
+    {withdrawals.length ? (
       <div
         style={{
           display: 'flex',
@@ -36,28 +38,12 @@ export const Withdrawals: React.FC<WithdrawalsProps> = ({ withdrawals }: Withdra
           <strong>Destination</strong>
           <strong style={{ textAlign: 'right' }}>Amount</strong>
         </div>
-        {withdrawals.map((w, i) => (
+        {withdrawals.map(w => (
           <div
             key={w.transactionHash}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '20px 10px',
-              borderBottom: '1px solid #555',
-              backgroundColor: i % 2 ? 'rgba(100, 100, 100, 0.1)' : 'rgba(100, 100, 100, 0.05)',
-            }}
+            className="row withdrawal"
           >
-            <div>
-              <span>{w.destination}</span>{' '}
-              <a
-                style={{ marginLeft: 20 }}
-                href={`https://etherscan.io/tx/${w.transactionHash}`}
-                title="view transaction on Etherscan.io"
-              >
-                <FiExternalLink />
-              </a>
-            </div>
+            <EtherscanLink target={w.destination} type="tx"/>
             <div style={{ textAlign: 'right' }}>{w.amount} DAI</div>
           </div>
         ))}

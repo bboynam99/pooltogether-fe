@@ -1,9 +1,10 @@
 import React from 'react'
 import { OnConfirmationHandler } from '../contract.model'
-import { PoolManagerContract } from './PoolManagerContract'
+import { PoolManagerInstance } from './poolManager.model'
 
 interface PoolManagerProps {
   accounts: string[]
+  poolManagerContract: PoolManagerInstance
   currentPoolComplete: boolean
   poolManagerInfo: any
   onConfirmation: OnConfirmationHandler
@@ -11,11 +12,11 @@ interface PoolManagerProps {
 
 export const PoolManager: React.FC<PoolManagerProps> = ({
   accounts,
+  poolManagerContract,
   currentPoolComplete,
   onConfirmation,
   poolManagerInfo,
 }: PoolManagerProps) => {
-  const { createPool } = PoolManagerContract()
   return (
     <div>
       <h2>Pool Management</h2>
@@ -23,7 +24,7 @@ export const PoolManager: React.FC<PoolManagerProps> = ({
         <button
           disabled={!currentPoolComplete}
           onClick={() =>
-            createPool(accounts[0], (confirmationNumber: number = 1) => {
+            poolManagerContract.createPool(accounts[0], (confirmationNumber: number = 1) => {
               onConfirmation(confirmationNumber)
             })
           }
