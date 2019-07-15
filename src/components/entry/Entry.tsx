@@ -74,7 +74,9 @@ export const Entry: React.FC<EntryProps> = ({
             {isWinner && <WinnerWinner balance={balance} entry={entry} winnings={winnings} />}
             {!isWinner && isComplete && <NoDice balance={balance} />}
             <div className="actions">
-              {Number(fromWei(allowance)) <= 0 && isOpen && <button onClick={connect}>Connect to Pool</button>}
+              {Number(fromWei(allowance)) <= 0 && isOpen && (
+                <button onClick={connect}>Connect to Pool</button>
+              )}
               {isComplete && Number(fromWei(balance)) > 0 && (
                 <WithdrawButton address={address} onConfirmation={update} pool={poolContract} />
               )}

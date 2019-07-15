@@ -6,13 +6,14 @@ import { PoolContract } from '../pool/PoolContract'
 import PoolManagerContractJSON from './PoolManager.json'
 import {
   defaultPastPoolManagerEvents,
-  PastPoolManagerEvents, IPoolManagerContract, PoolManagerContractState,
+  PastPoolManagerEvents,
+  IPoolManagerContract,
+  PoolManagerContractState,
   PoolManagerEvent,
   PoolManagerInfo,
-  PoolManagerInstance
+  PoolManagerInstance,
 } from './poolManager.model'
 import { pick, groupBy } from 'lodash'
-
 
 const poolManagerAddress = '0xBBF4ddd810690408398c47233D9c1844d8f8D4D6'
 const pmAbi: any = PoolManagerContractJSON.abi
@@ -201,15 +202,25 @@ export const PoolManagerFactory = (): IPoolManagerContract => {
   }
 }
 
-const contract = PoolManagerFactory()
+/**
+ * Actual instance of Pool manager. Only created once, right here.
+ */
+const poolManager = PoolManagerFactory()
 
-export const PoolManagerContract = async (playerAddress: string): Promise<PoolManagerInstance> => {
-  await contract.setPlayerAddress(playerAddress)
+/**
+ * Returns an updated PoolManager
+ * @param playerAddress
+ * @return Promise<PoolManagerInstance>
+ */
+export const getUpdatedPoolManager = async (
+  playerAddress: string,
+): Promise<PoolManagerInstance> => {
+  await poolManager.setPlayerAddress(playerAddress)
   return {
-    ...contract,
-    currentPool: contract.state.pools[contract.state.lastPoolNum],
-    isManager: contract.state.isManager,
-    pastEvents: contract.state.pastEvents,
-    pools: contract.state.pools,
+    ...poolManager,
+    currentPool: poolManager.state.pools[poolManager.state.lastPoolNum],
+    isManager: poolManager.state.isManager,
+    pastEvents: poolManager.state.pastEvents,
+    pools: poolManager.state.pools,
   }
 }

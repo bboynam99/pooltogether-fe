@@ -1,7 +1,7 @@
 import React from 'react'
 import { EtherscanLink } from '../EtherscanLink'
-import { abiEncodeSecret, asciiToHex, fromWei, soliditySha3 } from '../../web3'
-import { PoolInstance, PoolState } from '../../contracts/pool/pool.model'
+import { abiEncodeSecret, asciiToHex, fromWei, soliditySha3, toBn } from '../../web3'
+import { PoolEvent, PoolInstance, PoolState } from '../../contracts/pool/pool.model'
 import { PoolStateFns } from './PoolStateFns'
 
 interface PoolProps {
@@ -16,6 +16,10 @@ export const Pool: React.FC<PoolProps> = ({ account, pool, update }: PoolProps) 
   const isOpen = pool.info.poolState === PoolState.OPEN
   const secret: string = asciiToHex('test_pool')
   const secretHash: string = soliditySha3(abiEncodeSecret(secret))
+  const totalWithdrawn = pool.pastEvents[PoolEvent.WITHDRAWN].reduce(
+    (prev, next) => prev.add(next.amount),
+    toBn(0),
+  )
   const spacer = (
     <tr>
       <td colSpan={2}>
@@ -73,15 +77,15 @@ export const Pool: React.FC<PoolProps> = ({ account, pool, update }: PoolProps) 
             {spacer}
             <tr>
               <td>
-                <strong>Gross Winnings:</strong>
-              </td>
-              <td>{isComplete ? fromWei(pool.fee.add(pool.netWinnings)) : 0} DAI</td>
-            </tr>
-            <tr>
-              <td>
                 <strong>Entry Total:</strong>
               </td>
               <td>{fromWei(pool.info.entryTotal)} DAI</td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Gross Winnings:</strong>
+              </td>
+              <td>{isComplete ? fromWei(pool.fee.add(pool.netWinnings)) : 0} DAI</td>
             </tr>
             <tr>
               <td>
@@ -94,6 +98,23 @@ export const Pool: React.FC<PoolProps> = ({ account, pool, update }: PoolProps) 
                 <strong>Fee:</strong>
               </td>
               <td className="red">{isComplete ? fromWei(pool.fee) : 0} DAI</td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Withdrawn:</strong>
+              </td>
+              <td className="red">{fromWei(totalWithdrawn)} DAI</td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Net Balance:</strong>
+              </td>
+              <td>
+                {isComplete
+                  ? fromWei(pool.info.supplyBalanceTotal.sub(totalWithdrawn).sub(pool.fee))
+                  : 0}{' '}
+                DAI
+              </td>
             </tr>
             {spacer}
             <tr>

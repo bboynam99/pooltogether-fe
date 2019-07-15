@@ -8,7 +8,10 @@ import { EventData } from 'web3-eth-contract'
 
 const pAbi: any = PoolContractJSON.abi
 
-export const PoolContract = async (poolAddress: string, playerAddress: string): Promise<PoolInstance> => {
+export const PoolContract = async (
+  poolAddress: string,
+  playerAddress: string,
+): Promise<PoolInstance> => {
   const contract = getContract(pAbi, poolAddress)
   const {
     buyTickets,
@@ -127,7 +130,7 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
 
   contract.events
     .allEvents({ fromBlock: 0 })
-    .on('data', (events: EventData) => pastEvents = updatePastEvents(events, pastEvents))
+    .on('data', (events: EventData) => (pastEvents = updatePastEvents(events, pastEvents)))
 
   return {
     address: contract.address,

@@ -2,7 +2,7 @@ import BN from 'bn.js'
 import { EntryInfo } from '../components/entry/entry.model'
 import { PoolInfo, PoolInstance, PoolState } from './pool/pool.model'
 import { PoolManagerInfo, PoolManagerInstance } from './poolManager/poolManager.model'
-import { PoolManagerContract } from './poolManager/PoolManagerContract'
+import { getUpdatedPoolManager } from './poolManager/PoolManagerContract'
 import TokenContract, { TokenInstance } from './token/TokenContract'
 
 export interface ContractData {
@@ -48,40 +48,34 @@ export const getContractData = async (accounts: string[]): Promise<ContractData>
   const _account = accounts[0]
 
   // Pool Manager
-  const _poolManagerContract = await PoolManagerContract(_account)
-  const _poolManagerInfo = await _poolManagerContract.getInfo()
-  const _isPoolManager = _poolManagerContract.isManager
+  const managerInstance = await getUpdatedPoolManager(_account)
+  const managerInfo = await managerInstance.getInfo()
   // Current Pool
-  const _poolContract = _poolManagerContract.currentPool
+  const _poolContract = managerInstance.currentPool
   const _poolInfo = await _poolContract.getInfo()
-  const _isPoolOwner = await _poolContract.isOwner(_account)
-  const _entry = await _poolContract.getEntry(_account)
+  const entry = await _poolContract.getEntry(_account)
   const _winnings = await _poolContract.winnings(_account)
-  const _balance = _winnings.sub(_entry.withdrawn)
-
-  // Token
-  const allowance = await _tokenContract.allowance(_account, _poolManagerInfo._currentPool)
 
   return {
-    currentPool: _poolManagerContract.currentPool,
-    poolManagerContract: _poolManagerContract,
-    tokenContract: _tokenContract,
-    isPoolManager: _isPoolManager,
-    isPoolOwner: _isPoolOwner,
-    balance: _balance,
-    winnings: _winnings,
-    allowance,
-    lockDuration: _poolManagerInfo._lockDurationInBlocks,
-    openDuration: _poolManagerInfo._openDurationInBlocks,
-    pool: _poolManagerInfo._currentPool,
-    entry: _entry,
-    poolManagerInfo: _poolManagerInfo,
-    poolInfo: _poolInfo,
-    withdrawn: _entry.withdrawn,
-    isOpen: _poolInfo.poolState === PoolState.OPEN,
-    isLocked: _poolInfo.poolState === PoolState.LOCKED,
-    isUnlocked: _poolInfo.poolState === PoolState.UNLOCKED,
+    allowance: await _tokenContract.allowance(_account, managerInfo._currentPool),
+    balance: _winnings.sub(entry.withdrawn),
+    currentPool: managerInstance.currentPool,
+    entry,
+    isPoolManager: managerInstance.isManager,
     isComplete: _poolInfo.poolState === PoolState.COMPLETE,
+    isLocked: _poolInfo.poolState === PoolState.LOCKED,
+    isOpen: _poolInfo.poolState === PoolState.OPEN,
+    isPoolOwner: await _poolContract.isOwner(_account),
+    isUnlocked: _poolInfo.poolState === PoolState.UNLOCKED,
     isWinner: _poolInfo.winner.toLowerCase() === accounts[0].toLowerCase(),
+    lockDuration: managerInfo._lockDurationInBlocks,
+    openDuration: managerInfo._openDurationInBlocks,
+    pool: managerInfo._currentPool,
+    poolInfo: _poolInfo,
+    poolManagerContract: managerInstance,
+    poolManagerInfo: managerInfo,
+    tokenContract: _tokenContract,
+    winnings: _winnings,
+    withdrawn: entry.withdrawn,
   }
 }
