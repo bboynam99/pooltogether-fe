@@ -54,7 +54,15 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
 
   const _feeAmount = async (): Promise<BN> => toBn(await feeAmount().call())
 
-  const _getEntry = (account: string) => getEntry(account).call()
+  const _getEntry = async (account: string) => {
+    const e = await getEntry(account).call()
+    return {
+      ...e,
+      amount: toBn(e.amount),
+      ticketCount: toBn(e.ticketCount),
+      withdrawn: toBn(e.withdrawn),
+    }
+  }
 
   const _getInfo = async () => {
     const raw = await getInfo()
@@ -103,7 +111,7 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
       .send({ from: address })
       .on('confirmation', callback)
 
-  const _winnings = (address: string) => winnings(address).call()
+  const _winnings = async (address: string) => toBn(await winnings(address).call())
 
   const _withdraw = (account: string, callback: OnConfirmationHandler) =>
     withdraw()
@@ -115,7 +123,7 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
   const _netWinnings = await _getNetWinnings()
   const _fee = await _feeAmount()
 
-  const playerBalance = await contract.methods.balanceOf(playerAddress).call()
+  const playerBalance = toBn(await contract.methods.balanceOf(playerAddress).call())
 
   contract.events
     .allEvents({ fromBlock: 0 })

@@ -1,3 +1,4 @@
+import BN from 'bn.js'
 import { ContractEventResponse, OnConfirmationHandler } from '../contract.model'
 import { PoolInstance } from '../pool/pool.model'
 
@@ -18,16 +19,16 @@ export interface PoolManagerOwnershipChangedEvent extends ContractEventResponse 
 }
 
 export interface PoolCreatedEvent extends ContractEventResponse {
-  number: number
+  number: BN
   pool: string
 }
 
 export interface PoolParamDurationChangedEvent extends ContractEventResponse {
-  durationInBlocks: number
+  durationInBlocks: BN
 }
 
 export interface TicketPriceChangedEvent extends ContractEventResponse {
-  ticketPrice: number
+  ticketPrice: BN
 }
 
 export interface AllowLockAnyTimeChangedEvent extends ContractEventResponse {
@@ -35,7 +36,7 @@ export interface AllowLockAnyTimeChangedEvent extends ContractEventResponse {
 }
 
 export interface FeeFractionChangedEvent extends ContractEventResponse {
-  feeFractionFixedPoint18: number
+  feeFractionFixedPoint18: BN
 }
 
 export interface PastPoolManagerEvents {
@@ -50,11 +51,11 @@ export interface PastPoolManagerEvents {
 
 export interface PoolManagerInfo {
   _currentPool: string
-  _feeFractionFixedPoint18: number
-  _lockDurationInBlocks: number
-  _openDurationInBlocks: number
-  _poolCount: number
-  _ticketPrice: number
+  _feeFractionFixedPoint18: BN
+  _lockDurationInBlocks: BN
+  _openDurationInBlocks: BN
+  _poolCount: BN
+  _ticketPrice: BN
 }
 
 export interface PoolManagerInstance {

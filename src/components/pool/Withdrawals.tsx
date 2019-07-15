@@ -1,7 +1,7 @@
 import React from 'react'
-import { EtherscanLink } from '../../components/EtherscanLink'
-import { Withdrawal } from './pool.model'
-import { sumBy } from 'lodash'
+import { EtherscanLink } from '../EtherscanLink'
+import { fromWei, toBn } from '../../web3'
+import { Withdrawal } from '../../contracts/pool/pool.model'
 
 import './pool.scss'
 
@@ -14,7 +14,8 @@ export const Withdrawals: React.FC<WithdrawalsProps> = ({ withdrawals }: Withdra
     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
       <h1>Withdrawals</h1>
       <span>
-        <strong>Total withdrawn:</strong> {sumBy(withdrawals, 'amount')} DAI
+        <strong>Total withdrawn:</strong>{' '}
+        {fromWei(withdrawals.reduce((prev, next) => prev.add(next.amount), toBn(0)))} DAI
       </span>
     </div>
     {withdrawals.length ? (
@@ -46,7 +47,7 @@ export const Withdrawals: React.FC<WithdrawalsProps> = ({ withdrawals }: Withdra
               <td>
                 <EtherscanLink target={w.transactionHash} type="tx" />
               </td>
-              <td style={{ textAlign: 'right' }}>{w.amount} DAI</td>
+              <td style={{ textAlign: 'right' }}>{fromWei(w.amount)} DAI</td>
             </tr>
           ))}
         </tbody>

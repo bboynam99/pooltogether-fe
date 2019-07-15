@@ -1,17 +1,20 @@
 import React, { ChangeEvent, useState } from 'react'
-import { blankAddress } from '../contract.model'
-import { PoolInstance } from '../pool/pool.model'
+import BN from 'bn.js'
+import { fromWei } from '../../web3'
+import { blankAddress } from '../../contracts/contract.model'
+import { PoolInstance } from '../../contracts/pool/pool.model'
 import { WithdrawButton } from '../pool/WithdrawButton'
-import { TokenInstance } from '../token/TokenContract'
+import { TokenInstance } from '../../contracts/token/TokenContract'
+import { EntryInfo } from './entry.model'
 import { EntryStats } from './EntryStats'
 import { NoDice } from './NoDice'
 import { WinnerWinner } from './WinnerWinner'
 
 interface EntryProps {
   address: string
-  allowance: number
-  balance: number
-  entry: any
+  allowance: BN
+  balance: BN
+  entry: EntryInfo
   isComplete: boolean
   isOpen: boolean
   isWinner: boolean
@@ -19,7 +22,7 @@ interface EntryProps {
   poolContract: PoolInstance
   tokenContract: TokenInstance
   update: (confirmationNumber: number) => void
-  winnings: number
+  winnings: BN
 }
 
 export const Entry: React.FC<EntryProps> = ({
@@ -41,7 +44,7 @@ export const Entry: React.FC<EntryProps> = ({
   const connect = () => tokenContract.approve(pool, address, update)
 
   const buy = async () => {
-    if (!poolContract || allowance <= 0) return
+    if (!poolContract || Number(fromWei(allowance)) <= 0) return
     poolContract.buyTickets(numTixToBuy, address, (confirmationNumber: number) => {
       if (confirmationNumber === 1) setNumTixToBuy(1)
       update(confirmationNumber)
@@ -49,7 +52,6 @@ export const Entry: React.FC<EntryProps> = ({
   }
 
   const isBlankAddr = entry.addr === blankAddress
-
   return (
     <div>
       <h1 style={{ margin: '10px 0' }}>Your Entry</h1>
@@ -58,7 +60,9 @@ export const Entry: React.FC<EntryProps> = ({
         <p>You did not enter this pool</p>
       ) : (
         <div>
-          {allowance > 20 && <EntryStats account={address} entry={entry} winnings={winnings} />}
+          {Number(fromWei(allowance)) > 20 && (
+            <EntryStats account={address} entry={entry} winnings={winnings} />
+          )}
           <div
             style={{
               display: 'flex',
@@ -70,11 +74,11 @@ export const Entry: React.FC<EntryProps> = ({
             {isWinner && <WinnerWinner balance={balance} entry={entry} winnings={winnings} />}
             {!isWinner && isComplete && <NoDice balance={balance} />}
             <div className="actions">
-              {allowance <= 0 && isOpen && <button onClick={connect}>Connect to Pool</button>}
-              {isComplete && balance > 0 && (
+              {Number(fromWei(allowance)) <= 0 && isOpen && <button onClick={connect}>Connect to Pool</button>}
+              {isComplete && Number(fromWei(balance)) > 0 && (
                 <WithdrawButton address={address} onConfirmation={update} pool={poolContract} />
               )}
-              {isOpen && allowance > 0 && (
+              {isOpen && Number(fromWei(allowance)) > 0 && (
                 <div>
                   <input
                     type="number"

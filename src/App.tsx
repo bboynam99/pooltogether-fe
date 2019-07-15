@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react'
-
-import './App.css'
+import BN from 'bn.js'
 import { Header } from './components/Header'
 import { getContractData } from './contracts/contract.model'
-import { Entry } from './contracts/entry/Entry'
-import { Pool } from './contracts/pool/Pool'
+import { Entry } from './components/entry/Entry'
+import { EntryInfo } from './components/entry/entry.model'
+import { Pool } from './components/pool/Pool'
 import { PoolInstance, PoolInfo, PoolEvent } from './contracts/pool/pool.model'
-import { Purchases } from './contracts/pool/Purchases'
-import { Withdrawals } from './contracts/pool/Withdrawals'
-import { PoolManager } from './contracts/poolManager/PoolManager'
+import { Purchases } from './components/pool/Purchases'
+import { Withdrawals } from './components/pool/Withdrawals'
+import { PoolManager } from './components/poolManager/PoolManager'
 import { PoolManagerInfo, PoolManagerInstance } from './contracts/poolManager/poolManager.model'
-import { PreviousPools } from './contracts/poolManager/PreviousPools'
+import { PreviousPools } from './components/PreviousPools'
 import { TokenInstance } from './contracts/token/TokenContract'
 import { enable, onAccountsChanged, removeAccountsChanged } from './web3'
+import './styles/App.scss'
 
 const loading = <div style={{ margin: 20 }}>Loading...</div>
 
@@ -30,11 +31,11 @@ interface AppState {
   isLocked: boolean
   isUnlocked: boolean
   isComplete: boolean
-  allowance: number
-  balance: number
-  entry: any
-  withdrawn: number
-  winnings: number
+  allowance: BN
+  balance: BN
+  entry: EntryInfo
+  withdrawn: BN
+  winnings: BN
 }
 
 const App: React.FC = () => {
@@ -81,11 +82,9 @@ const App: React.FC = () => {
     <div className="App">
       {appState ? (
         <div className="grid-container">
-
           <Header />
 
           <div className="menu">
-
             {isPoolManager && (
               <PoolManager
                 accounts={accounts}
@@ -95,11 +94,18 @@ const App: React.FC = () => {
                 poolManagerInfo={poolManagerInfo}
               />
             )}
-            <PreviousPools address={accounts[0]} currentPoolAddress={poolManagerContract.currentPool.address} pools={poolManagerContract.pools} onConfirmation={update}/>
+            <PreviousPools
+              address={accounts[0]}
+              currentPoolAddress={poolManagerContract.currentPool.address}
+              pools={poolManagerContract.pools}
+              onConfirmation={update}
+            />
           </div>
 
           <div className="content">
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between'}}>
+            <div
+              style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}
+            >
               <Pool account={accounts[0]} pool={poolManagerContract.currentPool} update={update} />
               <Entry
                 address={accounts[0]}
@@ -117,12 +123,15 @@ const App: React.FC = () => {
               />
             </div>
 
-            <hr/>
-            <Purchases address={accounts[0]} purchases={poolManagerContract.currentPool.pastEvents[PoolEvent.BOUGHT_TICKETS]} />
-            <hr/>
-            <Withdrawals withdrawals={poolManagerContract.currentPool.pastEvents[PoolEvent.WITHDRAWN]} />
+            <hr />
+            <Purchases
+              address={accounts[0]}
+              purchases={poolManagerContract.currentPool.pastEvents[PoolEvent.BOUGHT_TICKETS]}
+            />
+            <Withdrawals
+              withdrawals={poolManagerContract.currentPool.pastEvents[PoolEvent.WITHDRAWN]}
+            />
           </div>
-
         </div>
       ) : (
         loading

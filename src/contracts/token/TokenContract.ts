@@ -1,11 +1,12 @@
-import { getContract, toWei } from '../../web3'
+import BN from 'bn.js'
+import { getContract, toBn, toWei } from '../../web3'
 import { OnConfirmationHandler } from '../contract.model'
 import TokenContractJson from './Token.json'
 
 export interface TokenInstance {
-  allowance: (owner: string, spender: string) => Promise<number>
+  allowance: (owner: string, spender: string) => Promise<BN>
   approve: (spender: string, owner: string, callback: OnConfirmationHandler) => Promise<void>
-  balanceOf: (address: string) => Promise<number>
+  balanceOf: (address: string) => Promise<BN>
   decreaseAllowance: (
     poolAddress: string,
     playerAddress: string,
@@ -20,7 +21,8 @@ export default (): TokenInstance => {
   const tokenContract = getContract(tAbi, tokenAddress)
   const { allowance, approve, balanceOf, decreaseAllowance } = tokenContract.methods
 
-  const _allowance = (owner: string, spender: string) => allowance(owner, spender).call()
+  const _allowance = async (owner: string, spender: string) =>
+    toBn(await allowance(owner, spender).call())
 
   const _approve = (spender: string, owner: string, callback: OnConfirmationHandler) =>
     approve(spender, toWei('2000'))
@@ -29,7 +31,7 @@ export default (): TokenInstance => {
       })
       .on('confirmation', callback)
 
-  const _balanceOf = (address: string) => balanceOf(address).call()
+  const _balanceOf = async (address: string) => toBn(await balanceOf(address).call())
 
   const _decreaseAllowance = (
     poolAddress: string,

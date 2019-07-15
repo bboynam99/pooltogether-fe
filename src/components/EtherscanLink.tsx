@@ -18,9 +18,7 @@ export const EtherscanLink: React.FC<EtherscanLinkProps> = ({
 }) => (
   <span style={{ display: 'flex', alignItems: 'center', ...style }}>
     <span>
-      {short
-        ? `${target.substr(0, length)}......${target.substr(target.length - length)}`
-        : target}{' '}
+      {short ? `${target.substr(0, length)}......${target.substr(target.length - length)}` : target}{' '}
     </span>
     <a
       style={{ marginLeft: 10 }}

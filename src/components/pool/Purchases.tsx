@@ -1,7 +1,7 @@
 import React from 'react'
-import { sumBy } from 'lodash'
-import { EtherscanLink } from '../../components/EtherscanLink'
-import { Purchase } from './pool.model'
+import { EtherscanLink } from '../EtherscanLink'
+import { fromWei, toBn } from '../../web3'
+import { Purchase } from '../../contracts/pool/pool.model'
 import './pool.scss'
 
 interface PurchasesProps {
@@ -14,7 +14,8 @@ export const Purchases: React.FC<PurchasesProps> = ({ address, purchases }: Purc
     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
       <h1>Purchases</h1>
       <span>
-        <strong>Total deposited:</strong> {sumBy(purchases, 'total')} DAI
+        <strong>Total deposited:</strong>{' '}
+        {fromWei(purchases.reduce((prev, next) => prev.add(next.total), toBn(0)))} DAI
       </span>
     </div>
     {purchases.length ? (
@@ -43,18 +44,19 @@ export const Purchases: React.FC<PurchasesProps> = ({ address, purchases }: Purc
           </div>
         </div>
         {purchases.map(p => (
-          <div
-            key={p.buyer}
-            className="row purchase"
-          >
+          <div key={p.buyer} className="row purchase">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <EtherscanLink target={p.buyer} type="address" />
-                <span>{address.toLowerCase() === p.buyer.toLowerCase() && "(that's you, that is!)"}</span>
+                <span>
+                  {address.toLowerCase() === p.buyer.toLowerCase() && "(that's you, that is!)"}
+                </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                <div>{p.tickets}</div>
-                <div style={{ width: 100, marginLeft: 10, textAlign: 'right' }}>{p.total} DAI</div>
+                <div>{p.tickets.toNumber()}</div>
+                <div style={{ width: 100, marginLeft: 10, textAlign: 'right' }}>
+                  {fromWei(p.total)} DAI
+                </div>
               </div>
             </div>
 
@@ -75,9 +77,9 @@ export const Purchases: React.FC<PurchasesProps> = ({ address, purchases }: Purc
                 <div
                   style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end' }}
                 >
-                  <div>{purchase.tickets}</div>
+                  <div>{purchase.tickets.toNumber()}</div>
                   <div style={{ width: 100, marginLeft: 10, textAlign: 'right' }}>
-                    {purchase.total} DAI
+                    {fromWei(purchase.total)} DAI
                   </div>
                 </div>
               </div>
