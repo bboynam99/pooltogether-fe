@@ -12,6 +12,7 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
   const {
     buyTickets,
     complete,
+    feeAmount,
     getEntry,
     getInfo,
     isOwner,
@@ -50,6 +51,8 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
       })
       .on('confirmation', callback)
 
+  const _feeAmount = () => feeAmount().call()
+
   const _getEntry = (account: string) => getEntry(account).call()
 
   const _getInfo = () =>
@@ -83,7 +86,7 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
       .send({ from: address })
       .on('confirmation', callback)
 
-  const _netWinnings = () => netWinnings().call()
+  const _getNetWinnings = () => netWinnings().call()
 
   const _unlock = (address: string, callback: OnConfirmationHandler) =>
     unlock()
@@ -99,6 +102,7 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
 
   const info = await _getInfo()
   const owner = await contract.methods.owner().call()
+  const _netWinnings = await _getNetWinnings()
   
   const playerBalance = await contract.methods.balanceOf(playerAddress).call()
 
@@ -110,9 +114,10 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
     address: contract.address,
     buyTickets: _buyTickets,
     complete: _complete,
-    pastEvents,
+    fee: await _feeAmount(),
     getEntry: _getEntry,
     getInfo: _getInfo,
+    getNetWinnings: _netWinnings,
     getPastEvents: _getPastEvents,
     info,
     isOwner: _isOwner,
@@ -120,6 +125,7 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
     methodDocs: _methodDocs,
     netWinnings: _netWinnings,
     owner,
+    pastEvents,
     playerBalance,
     unlock: _unlock,
     winnings: _winnings,

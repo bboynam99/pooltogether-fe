@@ -35,10 +35,6 @@ li {
   grid-row: 2 / 5;
   padding: 0 20px;
 }
-.entry {
-  grid-column: 3 / 9;
-  grid-row: 2;
-}
 
 .poolInfo {
   grid-column: 3 / 9;
@@ -74,7 +70,6 @@ li {
   grid-template-columns: repeat(3, 1fr);
   /*grid-gap: 10px;*/
   grid-auto-rows: minmax(100px, auto);
-  border-bottom: 1px solid #555;
   padding-bottom: 20px;
 }
 

@@ -83,14 +83,16 @@ export interface PoolInstance {
   address: string
   buyTickets: (numTix: number, account: string, callback: OnConfirmationHandler) => Promise<void>
   complete: (address: string, secret: string, callback: OnConfirmationHandler) => Promise<void>
+  fee: number
   getEntry: (account: string) => Promise<EntryInfo>
   getInfo: () => Promise<PoolInfo>
+  getNetWinnings: () => Promise<number>
   getPastEvents: (type?: PoolEvent, options?: any) => Promise<EventData[]>
   info: PoolInfo
   isOwner: (address: string) => Promise<boolean>
   lock: (address: string, secretHash: string, callback: OnConfirmationHandler) => Promise<void>
   methodDocs: { [key: string]: { notice: string } | string }
-  netWinnings: () => Promise<number>
+  netWinnings: number
   owner: string
   pastEvents: PastPoolEvents
   playerBalance: number

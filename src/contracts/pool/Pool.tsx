@@ -1,10 +1,8 @@
 import React from 'react'
 import { EtherscanLink } from '../../components/EtherscanLink'
 import { abiEncodeSecret, asciiToHex, fromWei, soliditySha3 } from '../../web3'
-import { PoolEvent, PoolInstance } from './pool.model'
-import { PoolStateTable } from './PoolStateTable'
-import { Purchases } from './Purchases'
-import { Withdrawals } from './Withdrawals'
+import { PoolInstance, PoolState } from './pool.model'
+import { PoolStateFns } from './PoolStateFns'
 import { get, startCase } from 'lodash'
 
 interface PoolProps {
@@ -19,81 +17,106 @@ export const Pool: React.FC<PoolProps> = ({ account, pool, update }: PoolProps) 
   const secretHash: string = soliditySha3(abiEncodeSecret(secret))
   return (
     <div className="poolInfo cell">
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <h2 style={{ marginTop: 0, marginBottom: 0 }}>Current Pool Info</h2>
-        <span>
-          <strong>Total Pool Capital:</strong> {fromWei(pool.info.entryTotal.toString())} DAI
-        </span>
-      </div>
-      <div style={{display: 'flex'}}>
-        <strong>Address:</strong> <EtherscanLink target={pool.address} type="address" style={{marginLeft: 10}} />
-      </div>
-      <div className="pool-grid-container">
-        {pool && (
-          <PoolStateTable account={account} isOwner={isOwner} pool={pool} secret={secret} secretHash={secretHash} update={update}/>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h1 style={{ margin: '10px 0' }}>Current Pool Info</h1>
+        {pool && isOwner && (
+          <PoolStateFns
+            account={account}
+            isOwner={isOwner}
+            pool={pool}
+            secret={secret}
+            secretHash={secretHash}
+            update={update}
+          />
         )}
-        <div className="pool-info-2">
-          <table>
-            <tbody>
-              {['ticketCost', 'supplyBalanceTotal', 'maxPoolSize', 'startBlock', 'endBlock'].map(
-                (name: string) => {
-                  const value = get(pool.info, name).toString()
-                  const convert = ['ticketCost', 'maxPoolSize', 'supplyBalanceTotal'].includes(name)
-                  const showWinner = name === 'winner'
-                  const winner =
-                    showWinner && value === '0x0000000000000000000000000000000000000000'
-                      ? 'TBA'
-                      : value
-                  name = name === 'estimatedInterestFixedPoint18' ? 'estimatedInterest' : name
-                  const full = (
-                    <tr key={name}>
-                      <td>
-                        <strong>{startCase(name)}:</strong>
-                      </td>
-                      <td>{showWinner ? winner : convert ? `${fromWei(value)} DAI` : value}</td>
-                    </tr>
-                  )
-                  return !['ticketCost', 'supplyBalanceTotal', 'maxPoolSize'].includes(name) && full
-                },
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="pool-info-3">
-          <table>
-            <tbody>
-              {['participantCount', 'estimatedInterestFixedPoint18', 'winner'].map(
-                (name: string) => {
-                  const value = get(pool.info, name).toString()
-                  const convert = ['estimatedInterestFixedPoint18'].includes(name)
-                  const showWinner = name === 'winner'
-                  const winner =
-                    showWinner && value === '0x0000000000000000000000000000000000000000'
-                      ? 'TBA'
-                      : value
-                  name = name === 'estimatedInterestFixedPoint18' ? 'estimatedInterest' : name
-                  return (
-                    <tr key={name.toString()}>
-                      <td>
-                        <strong>{startCase(name)}:</strong>
-                      </td>
-                      <td>{showWinner ? winner : convert ? `${fromWei(value)} DAI` : value}</td>
-                    </tr>
-                  )
-                },
-              )}
-            </tbody>
-          </table>
-        </div>
       </div>
-      <Purchases address={account} purchases={pool.pastEvents[PoolEvent.BOUGHT_TICKETS]} />
-      <Withdrawals withdrawals={pool.pastEvents[PoolEvent.WITHDRAWN]} />
+      <div>
+        <table>
+          <tbody>
+            <tr>
+              <td>
+                <strong>Address:</strong>
+              </td>
+              <td>
+                <EtherscanLink target={pool.address} type="address" />
+              </td>
+            </tr>
+            {[
+              'winner',
+              'poolState',
+              'participantCount',
+              'ticketCost',
+              'startBlock',
+              'endBlock',
+              'entryTotal',
+            ].map((name: string) => {
+              let value = get(pool.info, name).toString()
+              switch (name) {
+                case 'entryTotal':
+                case 'ticketCost':
+                  value = `${fromWei(value)} DAI`
+                  break
+                case 'winner':
+                  value =
+                    value === '0x0000000000000000000000000000000000000000' ? (
+                      'TBA'
+                    ) : (
+                      <EtherscanLink target={value} type="address" short={true} />
+                    )
+                  break
+                case 'poolState':
+                  value = PoolState[value]
+                  break
+                default:
+                  break
+              }
+              return (
+                <tr key={name}>
+                  <td>
+                    <strong>{startCase(name)}:</strong>
+                  </td>
+                  <td
+                    style={{
+                      color:
+                        value === 'OPEN'
+                          ? 'green'
+                          : ['COMPLETE', 'LOCKED', 'UNLOCKED'].includes(value)
+                          ? 'red'
+                          : '#000',
+                    }}
+                  >
+                    {value}
+                  </td>
+                </tr>
+              )
+            })}
+            <tr>
+              <td>
+                <strong>Gross Winnings:</strong>
+              </td>
+              <td>{`${fromWei(String(Number(pool.fee) + Number(pool.netWinnings)))} DAI`}</td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Fee:</strong>
+              </td>
+              <td>{fromWei(pool.fee.toString())} DAI</td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Net Winnings:</strong>
+              </td>
+              <td>{fromWei(pool.netWinnings.toString())} DAI</td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Total Balance:</strong>
+              </td>
+              <td>{fromWei(pool.info.supplyBalanceTotal.toString())} DAI</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

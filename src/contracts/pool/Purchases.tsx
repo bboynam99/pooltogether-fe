@@ -24,6 +24,7 @@ export const Purchases: React.FC<PurchasesProps> = ({ address, purchases }: Purc
           flexDirection: 'column',
           alignItems: 'space-between',
           justifyContent: 'center',
+          paddingBottom: 20,
         }}
       >
         <div
@@ -41,7 +42,7 @@ export const Purchases: React.FC<PurchasesProps> = ({ address, purchases }: Purc
             <strong style={{ width: 100, marginLeft: 10, textAlign: 'right' }}>Total</strong>
           </div>
         </div>
-        {purchases.map((p, i) => (
+        {purchases.map(p => (
           <div
             key={p.buyer}
             className="row purchase"

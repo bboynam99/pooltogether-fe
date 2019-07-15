@@ -10,7 +10,7 @@ interface WithdrawalsProps {
 }
 
 export const Withdrawals: React.FC<WithdrawalsProps> = ({ withdrawals }: WithdrawalsProps) => (
-  <div>
+  <div style={{ paddingBottom: 20 }}>
     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
       <h1>Withdrawals</h1>
       <span>
@@ -18,36 +18,39 @@ export const Withdrawals: React.FC<WithdrawalsProps> = ({ withdrawals }: Withdra
       </span>
     </div>
     {withdrawals.length ? (
-      <div
+      <table
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'space-between',
-          justifyContent: 'center',
+          width: '100%',
+          borderSpacing: 0,
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '20px 10px',
-            borderBottom: '1px solid #555',
-          }}
-        >
-          <strong>Destination</strong>
-          <strong style={{ textAlign: 'right' }}>Amount</strong>
-        </div>
-        {withdrawals.map(w => (
-          <div
-            key={w.transactionHash}
-            className="row withdrawal"
-          >
-            <EtherscanLink target={w.destination} type="tx"/>
-            <div style={{ textAlign: 'right' }}>{w.amount} DAI</div>
-          </div>
-        ))}
-      </div>
+        <thead>
+          <tr>
+            <th style={{ textAlign: 'left', padding: '20px 0', borderBottom: '1px solid #555' }}>
+              Destination
+            </th>
+            <th style={{ textAlign: 'left', padding: '20px 0', borderBottom: '1px solid #555' }}>
+              Transaction Hash
+            </th>
+            <th style={{ textAlign: 'right', padding: '20px 0', borderBottom: '1px solid #555' }}>
+              Amount
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {withdrawals.map(w => (
+            <tr key={w.transactionHash} className="row withdrawal">
+              <td>
+                <EtherscanLink target={w.destination} type="address" />
+              </td>
+              <td>
+                <EtherscanLink target={w.transactionHash} type="tx" />
+              </td>
+              <td style={{ textAlign: 'right' }}>{w.amount} DAI</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     ) : (
       <span>There are no withdrawals</span>
     )}

@@ -21,7 +21,7 @@ export const EntryStats: React.FC<EntryStatsProps> = ({
           <td>
             <strong>Address:</strong>
           </td>
-          <td><EtherscanLink target={addr === blankAddress ? account : addr} type="address" /></td>
+          <td><EtherscanLink target={addr === blankAddress ? account : addr} type="address" short={true} /></td>
         </tr>
         <tr>
           <td>

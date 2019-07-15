@@ -5,7 +5,9 @@ import { Header } from './components/Header'
 import { getContractData } from './contracts/contract.model'
 import { Entry } from './contracts/entry/Entry'
 import { Pool } from './contracts/pool/Pool'
-import { PoolInstance, PoolInfo } from './contracts/pool/pool.model'
+import { PoolInstance, PoolInfo, PoolEvent } from './contracts/pool/pool.model'
+import { Purchases } from './contracts/pool/Purchases'
+import { Withdrawals } from './contracts/pool/Withdrawals'
 import { PoolManager } from './contracts/poolManager/PoolManager'
 import { PoolManagerInfo, PoolManagerInstance } from './contracts/poolManager/poolManager.model'
 import { PreviousPools } from './contracts/poolManager/PreviousPools'
@@ -97,22 +99,28 @@ const App: React.FC = () => {
           </div>
 
           <div className="content">
-            <Entry
-              address={accounts[0]}
-              allowance={allowance}
-              balance={balance}
-              entry={entry}
-              isComplete={isComplete}
-              isOpen={isOpen}
-              isWinner={isWinner}
-              pool={pool}
-              poolContract={currentPool}
-              tokenContract={tokenContract}
-              update={update}
-              winnings={winnings}
-            />
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between'}}>
+              <Pool account={accounts[0]} pool={poolManagerContract.currentPool} update={update} />
+              <Entry
+                address={accounts[0]}
+                allowance={allowance}
+                balance={balance}
+                entry={entry}
+                isComplete={isComplete}
+                isOpen={isOpen}
+                isWinner={isWinner}
+                pool={pool}
+                poolContract={currentPool}
+                tokenContract={tokenContract}
+                update={update}
+                winnings={winnings}
+              />
+            </div>
 
-            <Pool account={accounts[0]} pool={poolManagerContract.currentPool} update={update} />
+            <hr/>
+            <Purchases address={accounts[0]} purchases={poolManagerContract.currentPool.pastEvents[PoolEvent.BOUGHT_TICKETS]} />
+            <hr/>
+            <Withdrawals withdrawals={poolManagerContract.currentPool.pastEvents[PoolEvent.WITHDRAWN]} />
           </div>
 
         </div>

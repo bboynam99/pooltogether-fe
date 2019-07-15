@@ -1,7 +1,6 @@
 import { fromWei } from '../web3'
 import { EntryInfo } from './entry/entry.model'
 import { PoolInfo, PoolInstance, PoolState } from './pool/pool.model'
-import { PoolContract } from './pool/PoolContract'
 import { PoolManagerInfo, PoolManagerInstance } from './poolManager/poolManager.model'
 import { PoolManagerContract } from './poolManager/PoolManagerContract'
 import TokenContract, { TokenInstance } from './token/TokenContract'
@@ -12,7 +11,6 @@ export interface ContractData {
   currentPool: PoolInstance
   poolManagerContract: PoolManagerInstance
   tokenContract: TokenInstance
-  netWinnings: number
   winnings: number
   balance: number
   allowance: number
@@ -55,11 +53,10 @@ export const getContractData = async (accounts: string[]): Promise<ContractData>
   const _isPoolManager = await _poolManagerContract.isManager(_account)
 
   // Current Pool
-  const _poolContract = await PoolContract(_poolManagerInfo._currentPool, _account)
+  const _poolContract = _poolManagerContract.currentPool
   const _poolInfo = await _poolContract.getInfo()
   const _isPoolOwner = await _poolContract.isOwner(_account)
   const _entry = await _poolContract.getEntry(_account)
-  const _netWinnings = await _poolContract.netWinnings()
   const _winnings = await _poolContract.winnings(_account)
   const _balance = _winnings - _entry.withdrawn
 
@@ -73,7 +70,6 @@ export const getContractData = async (accounts: string[]): Promise<ContractData>
     isPoolManager: _isPoolManager,
     isPoolOwner: _isPoolOwner,
     balance: _balance,
-    netWinnings: _netWinnings,
     winnings: _winnings,
     allowance: Number(fromWei(allowance.toString())),
     lockDuration: _poolManagerInfo._lockDurationInBlocks,

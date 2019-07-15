@@ -51,35 +51,29 @@ export const Entry: React.FC<EntryProps> = ({
   const isBlankAddr = entry.addr === blankAddress
 
   return (
-    <div className="entry cell">
-      <h2>Your Pooltogether</h2>
+    <div>
+      <h1 style={{ margin: '10px 0' }}>Your Entry</h1>
 
-      {isBlankAddr && isComplete ? (
+      {isBlankAddr && !isOpen ? (
         <p>You did not enter this pool</p>
       ) : (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <EntryStats account={address} entry={entry} winnings={winnings} />
+        <div>
+          {allowance > 20 && <EntryStats account={address} entry={entry} winnings={winnings} />}
           <div
             style={{
-              minHeight: 200,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'flex-end',
               justifyContent: 'space-between',
             }}
           >
-            {/*{allowance && (<div><strong>Allowance:</strong> {allowance} DAI</div>)}*/}
             {isWinner && <WinnerWinner balance={balance} entry={entry} winnings={winnings} />}
             {!isWinner && isComplete && <NoDice balance={balance} />}
             <div className="actions">
-              {allowance <= 0 && !isComplete && <button onClick={connect}>Connect to Pool</button>}
-              {isComplete && balance > 0 && <WithdrawButton address={address}  onConfirmation={update} pool={poolContract}/>}
+              {allowance <= 0 && isOpen && <button onClick={connect}>Connect to Pool</button>}
+              {isComplete && balance > 0 && (
+                <WithdrawButton address={address} onConfirmation={update} pool={poolContract} />
+              )}
               {isOpen && allowance > 0 && (
                 <div>
                   <input
@@ -89,8 +83,9 @@ export const Entry: React.FC<EntryProps> = ({
                     onChange={(evt: ChangeEvent<HTMLInputElement>) =>
                       setNumTixToBuy(Number(evt.target.value))
                     }
-                  /><br/>
-                  <button style={{width: '100%'}} onClick={buy}>
+                  />
+                  <br />
+                  <button style={{ width: '100%' }} onClick={buy}>
                     Buy {numTixToBuy === 1 ? 'a' : numTixToBuy} Ticket
                     {numTixToBuy > 1 && 's'}
                   </button>
@@ -100,8 +95,6 @@ export const Entry: React.FC<EntryProps> = ({
           </div>
         </div>
       )}
-
-      <hr />
     </div>
   )
 }
