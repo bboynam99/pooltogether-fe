@@ -1,6 +1,7 @@
 import Web3 from 'web3'
 import { Contract } from 'web3-eth-contract'
 import { AbiItem } from 'web3-utils'
+import BN from 'bn.js'
 
 interface Window {
   ethereum?: any
@@ -31,5 +32,6 @@ export const asciiToHex = (value: string): string => web3.utils.asciiToHex(value
 export const abiEncodeSecret = (secret: string): string =>
   web3.eth.abi.encodeParameter('bytes32', secret)
 export const soliditySha3 = (value: string): string => web3.utils.soliditySha3(value)
-export const fromWei = (value: string): string => web3.utils.fromWei(value)
+export const fromWei = (value: string | BN): string => web3.utils.fromWei(value)
 export const toWei = (value: string): string => web3.utils.toWei(value)
+export const toBn = (value: number): BN => web3.utils.toBN(value)

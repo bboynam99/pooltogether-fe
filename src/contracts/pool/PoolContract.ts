@@ -1,4 +1,5 @@
-import { getContract } from '../../web3'
+import { getContract, toBn } from '../../web3'
+import BN from 'bn.js'
 import { pick } from 'lodash'
 import { allEventsOptions, OnConfirmationHandler } from '../contract.model'
 import PoolContractJSON from './Pool.json'
@@ -51,12 +52,12 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
       })
       .on('confirmation', callback)
 
-  const _feeAmount = () => feeAmount().call()
+  const _feeAmount = async (): Promise<BN> => toBn(await feeAmount().call())
 
   const _getEntry = (account: string) => getEntry(account).call()
 
-  const _getInfo = () =>
-    getInfo()
+  const _getInfo = async () => {
+    const raw = await getInfo()
       .call()
       .then((info: PoolInfo) =>
         pick(info, [
@@ -73,6 +74,15 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
           'hashOfSecret',
         ]),
       )
+    return {
+      ...raw,
+      entryTotal: toBn(raw.entryTotal),
+      maxPoolSize: toBn(raw.maxPoolSize),
+      participantCount: toBn(raw.participantCount),
+      supplyBalanceTotal: toBn(raw.supplyBalanceTotal),
+      ticketCost: toBn(raw.ticketCost),
+    }
+  }
 
   const _getPastEvents = (
     type: PoolEvent = PoolEvent.ALL,
@@ -86,7 +96,7 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
       .send({ from: address })
       .on('confirmation', callback)
 
-  const _getNetWinnings = () => netWinnings().call()
+  const _getNetWinnings = async () => toBn(await netWinnings().call())
 
   const _unlock = (address: string, callback: OnConfirmationHandler) =>
     unlock()
@@ -103,7 +113,8 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
   const info = await _getInfo()
   const owner = await contract.methods.owner().call()
   const _netWinnings = await _getNetWinnings()
-  
+  const _fee = await _feeAmount()
+
   const playerBalance = await contract.methods.balanceOf(playerAddress).call()
 
   contract.events
@@ -114,10 +125,10 @@ export const PoolContract = async (poolAddress: string, playerAddress: string): 
     address: contract.address,
     buyTickets: _buyTickets,
     complete: _complete,
-    fee: await _feeAmount(),
+    fee: _fee,
     getEntry: _getEntry,
     getInfo: _getInfo,
-    getNetWinnings: _netWinnings,
+    getNetWinnings: _getNetWinnings,
     getPastEvents: _getPastEvents,
     info,
     isOwner: _isOwner,

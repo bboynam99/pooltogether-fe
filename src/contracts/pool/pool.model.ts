@@ -1,5 +1,6 @@
 import { fromWei } from '../../web3'
 import { ContractEventResponse, OnConfirmationHandler } from '../contract.model'
+import BN from 'bn.js'
 import { sumBy } from 'lodash'
 import { EntryInfo } from '../entry/entry.model'
 import { EventData } from 'web3-eth-contract'
@@ -12,16 +13,16 @@ export enum PoolState {
 }
 
 export interface PoolInfo {
-  entryTotal: number
+  entryTotal: BN
   startBlock: number
   endBlock: number
   poolState: PoolState
   winner: string
-  supplyBalanceTotal: number
-  ticketCost: number
-  participantCount: number
-  maxPoolSize: number
-  estimatedInterestFixedPoint18: number
+  supplyBalanceTotal: BN
+  ticketCost: BN
+  participantCount: BN
+  maxPoolSize: BN
+  estimatedInterestFixedPoint18: BN
   hashOfSecret: string
 }
 
@@ -83,16 +84,16 @@ export interface PoolInstance {
   address: string
   buyTickets: (numTix: number, account: string, callback: OnConfirmationHandler) => Promise<void>
   complete: (address: string, secret: string, callback: OnConfirmationHandler) => Promise<void>
-  fee: number
+  fee: BN
   getEntry: (account: string) => Promise<EntryInfo>
   getInfo: () => Promise<PoolInfo>
-  getNetWinnings: () => Promise<number>
+  getNetWinnings: () => Promise<BN>
   getPastEvents: (type?: PoolEvent, options?: any) => Promise<EventData[]>
   info: PoolInfo
   isOwner: (address: string) => Promise<boolean>
   lock: (address: string, secretHash: string, callback: OnConfirmationHandler) => Promise<void>
   methodDocs: { [key: string]: { notice: string } | string }
-  netWinnings: number
+  netWinnings: BN
   owner: string
   pastEvents: PastPoolEvents
   playerBalance: number
