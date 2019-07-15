@@ -50,8 +50,7 @@ export const getContractData = async (accounts: string[]): Promise<ContractData>
   // Pool Manager
   const _poolManagerContract = await PoolManagerContract(_account)
   const _poolManagerInfo = await _poolManagerContract.getInfo()
-  const _isPoolManager = await _poolManagerContract.isManager(_account)
-
+  const _isPoolManager = _poolManagerContract.isManager
   // Current Pool
   const _poolContract = _poolManagerContract.currentPool
   const _poolInfo = await _poolContract.getInfo()

@@ -58,13 +58,44 @@ export interface PoolManagerInfo {
   _ticketPrice: BN
 }
 
-export interface PoolManagerInstance {
-  createPool: (account: string, callback: OnConfirmationHandler) => Promise<void>
-  currentPool: PoolInstance
-  isManager: (account: string) => Promise<boolean>
+export interface IPoolManagerContract {
+  address: string
+  createPool: (account: string, callback: OnConfirmationHandler) => Promise<string>
+  isOwner: (account: string) => Promise<boolean>
   getInfo: () => Promise<PoolManagerInfo>
   getPastEvents: () => Promise<PastPoolManagerEvents>
-  methodDocs: { [key: string]: { notice: string } | string }
+  setFeeFraction: (feeFraction: BN, account: string) => Promise<any>
+  setOpenDuration: (durationInBlocks: number, account: string) => Promise<any>
+  setLockDuration: (durationInBlocks: number, account: string) => Promise<any>
+  setPlayerAddress: (address: string) => Promise<any>
+  setTicketPrice: (price: BN, account: string) => Promise<any>
+  state: PoolManagerContractState
+}
+
+export interface PoolManagerInstance extends IPoolManagerContract {
+  currentPool: PoolInstance
+  isManager: boolean
+  getInfo: () => Promise<PoolManagerInfo>
+  getPastEvents: () => Promise<PastPoolManagerEvents>
   pastEvents: PastPoolManagerEvents
   pools: { [key: string]: PoolInstance }
+  setPlayerAddress: (address: string) => Promise<void>
+}
+
+export interface PoolManagerContractState {
+  isManager: boolean
+  lastPoolNum: string
+  pastEvents: PastPoolManagerEvents
+  playerAddress: string
+  pools: { [key: string]: PoolInstance }
+}
+
+export const defaultPastPoolManagerEvents = {
+  [PoolManagerEvent.LOCK_DURATION_CHANGED]: [],
+  [PoolManagerEvent.POOL_CREATED]: [],
+  [PoolManagerEvent.FEE_FRACTION_CHANGED]: [],
+  [PoolManagerEvent.ALLOW_LOCK_ANYTIME_CHANGED]: [],
+  [PoolManagerEvent.OPEN_DURATION_CHANGED]: [],
+  [PoolManagerEvent.OWNERSHIP_TRANSFERRED]: [],
+  [PoolManagerEvent.TICKET_PRICE_CHANGED]: [],
 }

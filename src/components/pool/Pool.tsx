@@ -89,13 +89,13 @@ export const Pool: React.FC<PoolProps> = ({ account, pool, update }: PoolProps) 
               </td>
               <td>{fromWei(pool.info.supplyBalanceTotal)} DAI</td>
             </tr>
-            {spacer}
             <tr>
               <td>
                 <strong>Fee:</strong>
               </td>
               <td className="red">{isComplete ? fromWei(pool.fee) : 0} DAI</td>
             </tr>
+            {spacer}
             <tr>
               <td>
                 <strong>Net Winnings:</strong>
