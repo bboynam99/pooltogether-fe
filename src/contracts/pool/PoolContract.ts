@@ -125,7 +125,7 @@ export const PoolContract = async (
   const owner = await contract.methods.owner().call()
   const _netWinnings = await _getNetWinnings()
   const _fee = await _feeAmount()
-  const _entry = await getEntry(playerAddress)
+  const _entry = await _getEntry(playerAddress)
 
   const playerBalance = toBn(await contract.methods.balanceOf(playerAddress).call())
 

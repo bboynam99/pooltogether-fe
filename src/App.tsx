@@ -73,7 +73,6 @@ const App: React.FC = () => {
     isComplete,
     allowance,
     balance,
-    entry,
     winnings,
   } = appState
 
