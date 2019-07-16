@@ -41,6 +41,7 @@ interface AppState {
 const App: React.FC = () => {
   const [accounts, setAccounts] = useState<string[]>([])
   const [appState, setAppState] = useState<AppState | null>()
+  const [poolToView, setPoolToView] = useState<string>('')
 
   useEffect(() => {
     enable().then(setAccounts)
@@ -50,7 +51,7 @@ const App: React.FC = () => {
 
   const update = (confirmationNum: number) => {
     if (confirmationNum > 1) return
-    getContractData(accounts).then(setAppState)
+    getContractData(accounts, poolToView || '1').then(setAppState)
   }
 
   const updateEffectHandler = () => {
@@ -63,12 +64,10 @@ const App: React.FC = () => {
   if (!appState) return loading
 
   const {
-    currentPool,
     poolManagerContract,
     tokenContract,
     isPoolManager,
     poolManagerInfo,
-    pool,
     isWinner,
     isOpen,
     isComplete,
@@ -78,9 +77,13 @@ const App: React.FC = () => {
     winnings,
   } = appState
 
+  if (!poolToView) setPoolToView(poolManagerContract.state.lastPoolNum)
+  
+  const poolToViewInstance: PoolInstance = poolManagerContract.pools[poolToView]
+
   return (
     <div className="App">
-      {appState ? (
+      {appState && poolToViewInstance ? (
         <div className="grid-container">
           <Header />
 
@@ -96,9 +99,10 @@ const App: React.FC = () => {
             )}
             <PreviousPools
               address={accounts[0]}
-              currentPoolAddress={poolManagerContract.currentPool.address}
+              currentPoolAddress={poolToViewInstance.address}
               pools={poolManagerContract.pools}
               onConfirmation={update}
+              setPoolToView={setPoolToView}
             />
           </div>
 
@@ -106,17 +110,17 @@ const App: React.FC = () => {
             <div
               style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}
             >
-              <Pool account={accounts[0]} pool={poolManagerContract.currentPool} update={update} />
+              <Pool account={accounts[0]} pool={poolToViewInstance} update={update} />
               <Entry
                 address={accounts[0]}
                 allowance={allowance}
                 balance={balance}
-                entry={entry}
+                entry={poolToViewInstance.entry}
                 isComplete={isComplete}
                 isOpen={isOpen}
                 isWinner={isWinner}
-                pool={pool}
-                poolContract={currentPool}
+                pool={poolToViewInstance.address}
+                poolContract={poolToViewInstance}
                 tokenContract={tokenContract}
                 update={update}
                 winnings={winnings}
@@ -126,10 +130,10 @@ const App: React.FC = () => {
             <hr />
             <Purchases
               address={accounts[0]}
-              purchases={poolManagerContract.currentPool.pastEvents[PoolEvent.BOUGHT_TICKETS]}
+              purchases={poolToViewInstance.pastEvents[PoolEvent.BOUGHT_TICKETS]}
             />
             <Withdrawals
-              withdrawals={poolManagerContract.currentPool.pastEvents[PoolEvent.WITHDRAWN]}
+              withdrawals={poolToViewInstance.pastEvents[PoolEvent.WITHDRAWN]}
             />
           </div>
         </div>

@@ -43,15 +43,16 @@ export const allEventsOptions = {
 export const blankAddress = '0x0000000000000000000000000000000000000000'
 const _tokenContract = TokenContract()
 
-export const getContractData = async (accounts: string[]): Promise<ContractData> => {
+export const getContractData = async (accounts: string[], poolToView: string = '1'): Promise<ContractData> => {
   if (!accounts) throw new Error('No accounts supplied')
   const _account = accounts[0]
 
   // Pool Manager
   const managerInstance = await getUpdatedPoolManager(_account)
   const managerInfo = await managerInstance.getInfo()
+
   // Current Pool
-  const _poolContract = managerInstance.currentPool
+  const _poolContract = managerInstance.pools[poolToView]
   const _poolInfo = await _poolContract.getInfo()
   const entry = await _poolContract.getEntry(_account)
   const _winnings = await _poolContract.winnings(_account)

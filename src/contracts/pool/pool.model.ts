@@ -83,6 +83,7 @@ export interface PoolInstance {
   address: string
   buyTickets: (numTix: number, account: string, callback: OnConfirmationHandler) => Promise<void>
   complete: (address: string, secret: string, callback: OnConfirmationHandler) => Promise<void>
+  entry: EntryInfo,
   fee: BN
   getEntry: (account: string) => Promise<EntryInfo>
   getInfo: () => Promise<PoolInfo>
