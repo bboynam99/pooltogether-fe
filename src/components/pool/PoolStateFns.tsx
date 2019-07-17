@@ -23,9 +23,11 @@ export const PoolStateFns: React.FC<PoolStateProps> = ({
   const complete = () => pool.complete(account, secret, update)
   return (
     <div>
-      {pool.info.poolState === PoolState.OPEN && <button onClick={lock}>Lock</button>}
-      {pool.info.poolState === PoolState.LOCKED && <button onClick={unlock}>Unlock</button>}
-      {pool.info.poolState === PoolState.UNLOCKED && <button onClick={complete}>Complete</button>}
+      {pool.state.info.poolState === PoolState.OPEN && <button onClick={lock}>Lock</button>}
+      {pool.state.info.poolState === PoolState.LOCKED && <button onClick={unlock}>Unlock</button>}
+      {pool.state.info.poolState === PoolState.UNLOCKED && (
+        <button onClick={complete}>Complete</button>
+      )}
     </div>
   )
 }

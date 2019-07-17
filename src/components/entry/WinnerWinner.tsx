@@ -4,14 +4,12 @@ import { fromWei } from '../../web3'
 
 interface WinnerWinnerProps {
   balance: BN
-  entry: any
-  winnings: BN
+  netWinnings: BN
 }
 
 export const WinnerWinner: React.FC<WinnerWinnerProps> = ({
   balance,
-  entry,
-  winnings,
+  netWinnings,
 }: WinnerWinnerProps) => (
   <div
     style={{
@@ -25,11 +23,14 @@ export const WinnerWinner: React.FC<WinnerWinnerProps> = ({
     <div style={{ margin: '20px 0' }}>
       <span>You won</span>
       <strong className="green" style={{ fontSize: 38, marginLeft: 10 }}>
-        {fromWei(String(winnings.sub(entry.amount)))} DAI
+        {fromWei(netWinnings)} DAI
       </strong>
     </div>
     {Number(fromWei(balance)) === 0 && (
-      <p>Your winnings have been withdrawn. Thanks for playing!</p>
+      <div>
+        <div>Your winnings and deposit have been withdrawn.</div>
+        <div>Thanks for playing!</div>
+      </div>
     )}
   </div>
 )

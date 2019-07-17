@@ -37,32 +37,42 @@ export const PreviousPools: React.FC<PreviousPoolsProps> = ({
                   target={_pool.address}
                   type="address"
                   short={true}
-                  length={7}
+                  length={10}
                   style={{
                     color: isViewing ? 'red' : 'black',
                     marginLeft: 10,
                   }}
                 />
                 <span
-                  style={{ marginLeft: 10, cursor: 'pointer', color: isViewing ? 'red' : 'black' }}
+                  style={{
+                    marginLeft: 10,
+                    cursor: 'pointer',
+                    color: isViewing ? 'red' : 'black',
+                    fontSize: 24,
+                  }}
                   onClick={() => setPoolToView(key)}
                 >
                   <FiEye />
                 </span>
               </div>
-              {Number(_pool.playerBalance.toString()) > 0 &&
-                _pool.info.poolState === PoolState.COMPLETE && (
+              {Number(_pool.state.balance.toString()) > 0 &&
+                _pool.state.info.poolState === PoolState.COMPLETE && (
                   <WithdrawButton address={address} onConfirmation={onConfirmation} pool={_pool} />
                 )}
             </div>
           )
           return isCurrent ? (
-            <div key={_pool.address} style={{ borderRadius: 3, padding: 10, backgroundColor: '#eee' }}>
+            <div
+              key={_pool.address}
+              style={{ borderRadius: 3, padding: 10, backgroundColor: '#eee' }}
+            >
               <h4 style={{ marginTop: 0, marginBottom: 5 }}>Current pool</h4>
               <span>{lineItem}</span>
             </div>
           ) : (
-            <div key={_pool.address}>{lineItem}</div>
+            <div key={_pool.address} style={{ padding: 10 }}>
+              {lineItem}
+            </div>
           )
         })}
     </div>

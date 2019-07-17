@@ -1,19 +1,21 @@
 import BN from 'bn.js'
 import React from 'react'
-import { EtherscanLink } from '../../components/EtherscanLink'
 import { blankAddress } from '../../contracts/contract.model'
+import { EntryInfo } from '../../contracts/pool/pool.model'
 import { fromWei } from '../../web3'
-import { EntryInfo } from './entry.model'
+import { EtherscanLink } from '../EtherscanLink'
 
 interface EntryStatsProps {
   account: string
   entry: EntryInfo
-  winnings: BN
+  netWinnings: BN
+  grossWinnings: BN
 }
 export const EntryStats: React.FC<EntryStatsProps> = ({
   account,
   entry: { addr, amount, ticketCount, withdrawn },
-  winnings,
+  netWinnings,
+  grossWinnings,
 }: EntryStatsProps) => (
   <div>
     <table>
@@ -40,25 +42,25 @@ export const EntryStats: React.FC<EntryStatsProps> = ({
           <td>
             <strong>Deposit:</strong>
           </td>
-          <td>{fromWei(amount.toString())} DAI</td>
+          <td>{fromWei(amount)} DAI</td>
         </tr>
         <tr>
           <td>
             <strong>Winnings:</strong>
           </td>
-          <td>{fromWei(String(winnings.sub(amount)))} DAI</td>
+          <td>{fromWei(netWinnings)} DAI</td>
         </tr>
         <tr>
           <td>
             <strong>Withdrawn:</strong>
           </td>
-          <td>{fromWei(withdrawn.toString())} DAI</td>
+          <td>{fromWei(withdrawn)} DAI</td>
         </tr>
         <tr>
           <td>
             <strong>Balance:</strong>
           </td>
-          <td>{fromWei(String(winnings.sub(withdrawn)))} DAI</td>
+          <td>{fromWei(grossWinnings.sub(withdrawn))} DAI</td>
         </tr>
       </tbody>
     </table>

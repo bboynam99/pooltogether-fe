@@ -4,7 +4,7 @@ import { PoolManagerInstance } from '../../contracts/poolManager/poolManager.mod
 
 interface PoolManagerProps {
   accounts: string[]
-  poolManagerContract: PoolManagerInstance
+  manager: PoolManagerInstance
   currentPoolComplete: boolean
   poolManagerInfo: any
   onConfirmation: OnConfirmationHandler
@@ -12,7 +12,7 @@ interface PoolManagerProps {
 
 export const PoolManager: React.FC<PoolManagerProps> = ({
   accounts,
-  poolManagerContract,
+  manager,
   currentPoolComplete,
   onConfirmation,
   poolManagerInfo,
@@ -24,7 +24,7 @@ export const PoolManager: React.FC<PoolManagerProps> = ({
         <button
           disabled={!currentPoolComplete}
           onClick={() =>
-            poolManagerContract.createPool(accounts[0], (confirmationNumber: number = 1) => {
+            manager.createPool(accounts[0], (confirmationNumber: number = 1) => {
               onConfirmation(confirmationNumber)
             })
           }

@@ -1,7 +1,6 @@
 import BN from 'bn.js'
 import { getContract } from '../../web3'
 import { allEventsOptions, OnConfirmationHandler } from '../contract.model'
-import { PoolEvent, PoolInstance } from '../pool/pool.model'
 import { PoolContract } from '../pool/PoolContract'
 import PoolManagerContractJSON from './PoolManager.json'
 import {
@@ -14,6 +13,7 @@ import {
   PoolManagerInstance,
 } from './poolManager.model'
 import { pick, groupBy } from 'lodash'
+import { EventData } from 'web3-eth-contract'
 
 const poolManagerAddress = '0xBBF4ddd810690408398c47233D9c1844d8f8D4D6'
 const pmAbi: any = PoolManagerContractJSON.abi
@@ -48,7 +48,7 @@ export const PoolManagerFactory = (): IPoolManagerContract => {
    * Fires the PoolCreated event.
    * @param address The sender of the
    * @param callback Called on 'confirmation' event
-   * @return The address of the new pool
+   * @return The playerAddress of the new pool
    */
   const _createPool = async (address: string, callback: OnConfirmationHandler) => {
     await isOwnerCheck(address)
@@ -62,7 +62,7 @@ export const PoolManagerFactory = (): IPoolManagerContract => {
   /**
    * @description Returns information about the PoolManager
    * @return A tuple containing:
-   *    _currentPool (the address of the current pool),
+   *    _currentPool (the playerAddress of the current pool),
    *    _openDurationInBlocks (the open duration in blocks to use for the next pool),
    *    _lockDurationInBlocks (the lock duration in blocks to use for the next pool),
    *    _ticketPrice (the ticket price in DAI for the next pool),
@@ -89,14 +89,14 @@ export const PoolManagerFactory = (): IPoolManagerContract => {
    * @param options
    */
   const _getPastEvents = (
-    type: PoolEvent = PoolEvent.ALL,
+    type: PoolManagerEvent = PoolManagerEvent.ALL,
     options: any = allEventsOptions,
   ): Promise<PastPoolManagerEvents> =>
     contract.getPastEvents(type, options).then(events => {
       const grouped = groupBy(events, 'event')
       return {
         [PoolManagerEvent.LOCK_DURATION_CHANGED]: [],
-        [PoolManagerEvent.POOL_CREATED]: grouped[PoolManagerEvent.POOL_CREATED].map(evt => ({
+        [PoolManagerEvent.POOL_CREATED]: (grouped[PoolManagerEvent.POOL_CREATED] || []).map(evt => ({
           event: PoolManagerEvent.POOL_CREATED,
           transactionHash: evt.transactionHash,
           address: evt.address,
@@ -116,7 +116,7 @@ export const PoolManagerFactory = (): IPoolManagerContract => {
    * Fires the FeeFractionChanged event.
    * Can only be called by the owner. Only applies to subsequent Pools.
    * @param feeFractionFixedPoint18 The fraction to pay out.
-   * @param address The address of the sender.
+   * @param address The playerAddress of the sender.
    * Must be between 0 and 1 and formatted as a fixed point number with 18 decimals (as in Ether).
    */
   const _setFeeFraction = async (feeFractionFixedPoint18: BN, address: string) => {
@@ -129,7 +129,7 @@ export const PoolManagerFactory = (): IPoolManagerContract => {
    * Fires the LockDurationChanged event.
    * Can only be set by the owner.  Only applies to subsequent Pools.
    * @param lockDurationInBlocks The duration, in blocks, that new pools must be locked for.
-   * @param address The address of the sender.
+   * @param address The playerAddress of the sender.
    */
   const _setLockDuration = async (lockDurationInBlocks: number, address: string) => {
     await isOwnerCheck(address)
@@ -141,7 +141,7 @@ export const PoolManagerFactory = (): IPoolManagerContract => {
    * Fires the OpenDurationChanged event.
    * Can only be set by the owner.  Fires the OpenDurationChanged event.
    * @param openDurationInBlocks The duration, in blocks, that a pool must be open for after it is created.
-   * @param address The address of the sender.
+   * @param address The playerAddress of the sender.
    */
   const _setOpenDuration = async (openDurationInBlocks: number, address: string) => {
     await isOwnerCheck(address)
@@ -153,30 +153,22 @@ export const PoolManagerFactory = (): IPoolManagerContract => {
    * Fires the TicketPriceChanged event.
    * Can only be called by the owner.  Only applies to subsequent Pools.
    * @param ticketPrice The new price for tickets.
-   * @param address The address of the sender.
+   * @param address The playerAddress of the sender.
    */
   const _setTicketPrice = async (ticketPrice: BN, address: string) => {
     await isOwnerCheck(address)
     setTicketPrice(ticketPrice).send({ from: address })
   }
 
-  const _updatePools = async () => {
-    state.lastPoolNum = '1'
-    state.pools = (await Promise.all(
-      state.pastEvents[PoolManagerEvent.POOL_CREATED].map(async evt => ({
-        event: evt,
-        contract: await PoolContract(evt.pool, state.playerAddress),
-      })),
-    )).reduce(
-      (prev, next) => {
-        state.lastPoolNum = next.event.number.toString()
-        return {
-          ...prev,
-          [state.lastPoolNum]: next.contract,
-        }
-      },
-      // eslint-disable-next-line @typescript-eslint/no-object-literal-type-assertion
-      {} as { [key: string]: PoolInstance },
+  const _createPools = async () => {
+    const pe = await contract.getPastEvents(PoolManagerEvent.POOL_CREATED, allEventsOptions)
+    await Promise.all(
+      pe.map(async event => {
+        state.pools[event.returnValues.number.toString()] = await PoolContract(
+          event.returnValues.pool,
+          state.playerAddress,
+        )
+      }),
     )
   }
 
@@ -184,8 +176,20 @@ export const PoolManagerFactory = (): IPoolManagerContract => {
     state.playerAddress = address
     state.isManager = await _isOwner(address)
     state.pastEvents = await _getPastEvents()
-    await _updatePools()
+    if (!Object.values(state.pools).length) {
+      await _createPools()
+    }
+    Object.values(state.pools).forEach(pool => pool.setPlayerAddress(address))
   }
+
+  contract.events[PoolManagerEvent.POOL_CREATED]().on('data', async (event: EventData) => {
+    const {
+      returnValues: { number, pool },
+    } = event
+    if (state.pools[number.toString()]) return
+    state.pools[number.toString()] = await PoolContract(pool, state.playerAddress)
+  })
+
 
   return {
     address: contract.address,

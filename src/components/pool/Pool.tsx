@@ -1,7 +1,12 @@
 import React from 'react'
+import {
+  calculateWithdrawn,
+  PoolEvent,
+  PoolInstance,
+  PoolState,
+} from '../../contracts/pool/pool.model'
 import { EtherscanLink } from '../EtherscanLink'
-import { abiEncodeSecret, asciiToHex, fromWei, soliditySha3, toBn } from '../../web3'
-import { PoolEvent, PoolInstance, PoolState } from '../../contracts/pool/pool.model'
+import { abiEncodeSecret, asciiToHex, fromWei, soliditySha3 } from '../../web3'
 import { PoolStateFns } from './PoolStateFns'
 
 interface PoolProps {
@@ -11,15 +16,16 @@ interface PoolProps {
 }
 
 export const Pool: React.FC<PoolProps> = ({ account, pool, update }: PoolProps) => {
-  const isOwner = account.toLowerCase() === pool.owner.toLowerCase()
-  const isComplete = pool.info.poolState === PoolState.COMPLETE
-  const isOpen = pool.info.poolState === PoolState.OPEN
+  const {
+    pastEvents,
+    state: { info, fee, netWinnings, owner },
+  } = pool
+  const isOwner = account.toLowerCase() === owner.toLowerCase()
+  const isComplete = info.poolState === PoolState.COMPLETE
+  const isOpen = info.poolState === PoolState.OPEN
   const secret: string = asciiToHex('test_pool')
   const secretHash: string = soliditySha3(abiEncodeSecret(secret))
-  const totalWithdrawn = pool.pastEvents[PoolEvent.WITHDRAWN].reduce(
-    (prev, next) => prev.add(next.amount),
-    toBn(0),
-  )
+  const totalWithdrawn = calculateWithdrawn(pastEvents[PoolEvent.WITHDRAWN])
   const spacer = (
     <tr>
       <td colSpan={2}>
@@ -31,7 +37,7 @@ export const Pool: React.FC<PoolProps> = ({ account, pool, update }: PoolProps) 
     <div className="poolInfo cell">
       <div className="heading">
         <h1>Current Pool Info</h1>
-        <h3 className={isOpen ? 'green' : 'red'}>{PoolState[pool.info.poolState]}</h3>
+        <h3 className={isOpen ? 'green' : 'red'}>{PoolState[info.poolState]}</h3>
       </div>
       <div>
         <table>
@@ -49,10 +55,10 @@ export const Pool: React.FC<PoolProps> = ({ account, pool, update }: PoolProps) 
                 <strong>Winner:</strong>
               </td>
               <td>
-                {pool.info.winner === '0x0000000000000000000000000000000000000000' ? (
+                {info.winner === '0x0000000000000000000000000000000000000000' ? (
                   'TBA'
                 ) : (
-                  <EtherscanLink target={pool.info.winner} type="address" short={true} />
+                  <EtherscanLink target={info.winner} type="address" short={true} />
                 )}
               </td>
             </tr>
@@ -60,44 +66,44 @@ export const Pool: React.FC<PoolProps> = ({ account, pool, update }: PoolProps) 
               <td>
                 <strong>Participant Count:</strong>
               </td>
-              <td>{pool.info.participantCount.toString()}</td>
+              <td>{info.participantCount.toString()}</td>
             </tr>
             <tr>
               <td>
                 <strong>Ticket Cost:</strong>
               </td>
-              <td>{fromWei(pool.info.ticketCost)} DAI</td>
+              <td>{fromWei(info.ticketCost)} DAI</td>
             </tr>
             <tr>
               <td>
                 <strong>Tickets Sold:</strong>
               </td>
-              <td>{pool.info.entryTotal.div(pool.info.ticketCost).toString()}</td>
+              <td>{info.entryTotal.div(info.ticketCost).toString()}</td>
             </tr>
             {spacer}
             <tr>
               <td>
                 <strong>Entry Total:</strong>
               </td>
-              <td>{fromWei(pool.info.entryTotal)} DAI</td>
+              <td>{fromWei(info.entryTotal)} DAI</td>
             </tr>
             <tr>
               <td>
                 <strong>Gross Winnings:</strong>
               </td>
-              <td>{isComplete ? fromWei(pool.fee.add(pool.netWinnings)) : 0} DAI</td>
+              <td>{isComplete ? fromWei(fee.add(netWinnings)) : 0} DAI</td>
             </tr>
             <tr>
               <td>
                 <strong>Gross Balance:</strong>
               </td>
-              <td>{fromWei(pool.info.supplyBalanceTotal)} DAI</td>
+              <td>{fromWei(info.supplyBalanceTotal)} DAI</td>
             </tr>
             <tr>
               <td>
                 <strong>Fee:</strong>
               </td>
-              <td className="red">{isComplete ? fromWei(pool.fee) : 0} DAI</td>
+              <td className="red">{isComplete ? fromWei(fee) : 0} DAI</td>
             </tr>
             <tr>
               <td>
@@ -110,10 +116,7 @@ export const Pool: React.FC<PoolProps> = ({ account, pool, update }: PoolProps) 
                 <strong>Net Balance:</strong>
               </td>
               <td>
-                {isComplete
-                  ? fromWei(pool.info.supplyBalanceTotal.sub(totalWithdrawn).sub(pool.fee))
-                  : 0}{' '}
-                DAI
+                {isComplete ? fromWei(info.supplyBalanceTotal.sub(totalWithdrawn).sub(fee)) : 0} DAI
               </td>
             </tr>
             {spacer}
@@ -121,7 +124,7 @@ export const Pool: React.FC<PoolProps> = ({ account, pool, update }: PoolProps) 
               <td>
                 <strong>Net Winnings:</strong>
               </td>
-              <td className="net-winnings">{isComplete ? fromWei(pool.netWinnings) : 0} DAI</td>
+              <td className="net-winnings">{isComplete ? fromWei(netWinnings) : 0} DAI</td>
             </tr>
             {isOwner && !isComplete && spacer}
             {isOwner && !isComplete && (

@@ -1,10 +1,18 @@
-import { getContract, toBn } from '../../web3'
 import BN from 'bn.js'
 import { pick } from 'lodash'
-import { allEventsOptions, OnConfirmationHandler } from '../contract.model'
-import PoolContractJSON from './Pool.json'
-import { PastPoolEvents, PoolEvent, PoolInfo, PoolInstance, updatePastEvents } from './pool.model'
 import { EventData } from 'web3-eth-contract'
+import { getContract, toBn } from '../../web3'
+import { allEventsOptions, OnConfirmationHandler, tokenContract } from '../contract.model'
+import PoolContractJSON from './Pool.json'
+import {
+  defaultPastPoolEvents,
+  PastPoolEvents,
+  PoolContractState,
+  PoolEvent,
+  PoolInfo,
+  PoolInstance,
+  updatePastEvents,
+} from './pool.model'
 
 const pAbi: any = PoolContractJSON.abi
 
@@ -14,6 +22,7 @@ export const PoolContract = async (
 ): Promise<PoolInstance> => {
   const contract = getContract(pAbi, poolAddress)
   const {
+    balanceOf,
     buyTickets,
     complete,
     feeAmount,
@@ -22,20 +31,13 @@ export const PoolContract = async (
     isOwner,
     lock,
     netWinnings,
+    owner,
     unlock,
     winnings,
     withdraw,
   } = contract.methods
-  const _methodDocs = PoolContractJSON.userdoc.methods
 
-  let pastEvents: PastPoolEvents = {
-    [PoolEvent.BOUGHT_TICKETS]: [],
-    [PoolEvent.WITHDRAWN]: [],
-    [PoolEvent.POOL_LOCKED]: [],
-    [PoolEvent.POOL_UNLOCKED]: [],
-    [PoolEvent.POOL_COMPLETE]: [],
-    [PoolEvent.OWNERSHIP_TRANSFERRED]: [],
-  }
+  const _balanceOf = async (address: string) => toBn(await balanceOf(address).call())
 
   const _buyTickets = (
     numTix: number,
@@ -95,10 +97,8 @@ export const PoolContract = async (
     }
   }
 
-  const _getPastEvents = (
-    type: PoolEvent = PoolEvent.ALL,
-    options: any = allEventsOptions,
-  ): Promise<EventData[]> => contract.getPastEvents(type, options)
+  const _getPastEvents = (type: PoolEvent = PoolEvent.ALL, options: any = allEventsOptions) =>
+    contract.getPastEvents(type, options)
 
   const _isOwner = (address: string) => isOwner().call({ from: address })
 
@@ -107,7 +107,10 @@ export const PoolContract = async (
       .send({ from: address })
       .on('confirmation', callback)
 
-  const _getNetWinnings = async () => toBn(await netWinnings().call())
+  const _getNetWinnings = async (address: string) =>
+    toBn(await netWinnings().call({ from: address }))
+
+  const _getOwner = () => owner.call()
 
   const _unlock = (address: string, callback: OnConfirmationHandler) =>
     unlock()
@@ -121,36 +124,53 @@ export const PoolContract = async (
       .send({ from: account, value: 0 })
       .on('confirmation', callback)
 
-  const info = await _getInfo()
-  const owner = await contract.methods.owner().call()
-  const _netWinnings = await _getNetWinnings()
-  const _fee = await _feeAmount()
-  const _entry = await _getEntry(playerAddress)
+  let pastEvents: PastPoolEvents = defaultPastPoolEvents
+  const state: PoolContractState = {
+    allowance: toBn(0),
+    balance: toBn(0),
+    entry: await _getEntry(playerAddress),
+    fee: toBn(0),
+    grossWinnings: toBn(0),
+    info: await _getInfo(),
+    netWinnings: toBn(0),
+    owner: await _getOwner(),
+    pastEvents: defaultPastPoolEvents,
+    playerAddress,
+  }
 
-  const playerBalance = toBn(await contract.methods.balanceOf(playerAddress).call())
+  const setPlayerAddress = async (address: string) => {
+    state.playerAddress = address
+    state.allowance = await tokenContract.allowance(playerAddress, contract.address)
+    state.balance = await _balanceOf(playerAddress)
+    state.entry = await _getEntry(playerAddress)
+    state.fee = await _feeAmount()
+    state.grossWinnings = await _winnings(playerAddress)
+    state.info = await _getInfo()
+    state.netWinnings = await _getNetWinnings(playerAddress)
+  }
 
   contract.events
     .allEvents({ fromBlock: 0 })
-    .on('data', (events: EventData) => (pastEvents = updatePastEvents(events, pastEvents)))
+    .on(
+      'data',
+      async (event: EventData) => await updatePastEvents(event, state.pastEvents),
+    )
 
   return {
     address: contract.address,
+    balanceOf,
     buyTickets: _buyTickets,
     complete: _complete,
-    entry: _entry,
-    fee: _fee,
     getEntry: _getEntry,
     getInfo: _getInfo,
     getNetWinnings: _getNetWinnings,
+    getOwner: _getOwner,
     getPastEvents: _getPastEvents,
-    info,
     isOwner: _isOwner,
     lock: _lock,
-    methodDocs: _methodDocs,
-    netWinnings: _netWinnings,
-    owner,
     pastEvents,
-    playerBalance,
+    setPlayerAddress,
+    state,
     unlock: _unlock,
     winnings: _winnings,
     withdraw: _withdraw,

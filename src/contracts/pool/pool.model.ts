@@ -1,7 +1,6 @@
 import { toBn } from '../../web3'
 import { ContractEventResponse, OnConfirmationHandler } from '../contract.model'
 import BN from 'bn.js'
-import { EntryInfo } from '../../components/entry/entry.model'
 import { EventData } from 'web3-eth-contract'
 
 export enum PoolState {
@@ -25,6 +24,19 @@ export interface PoolInfo {
   hashOfSecret: string
 }
 
+export interface PoolContractState {
+  allowance: BN
+  balance: BN
+  entry: EntryInfo
+  fee: BN
+  grossWinnings: BN
+  info: PoolInfo
+  netWinnings: BN
+  owner: string
+  pastEvents: PastPoolEvents
+  playerAddress: string
+}
+
 export interface PurchaseDetail {
   hash: string
   tickets: BN
@@ -32,6 +44,7 @@ export interface PurchaseDetail {
 }
 
 export interface Purchase {
+  address: string
   buyer: string
   tickets: BN
   total: BN
@@ -79,35 +92,49 @@ export interface PastPoolEvents {
   [PoolEvent.OWNERSHIP_TRANSFERRED]: OwnershipTransferredEvent[]
 }
 
+export interface EntryInfo {
+  addr: string
+  amount: BN
+  ticketCount: BN
+  withdrawn: BN
+}
+
 export interface PoolInstance {
   address: string
+  balanceOf: (address: string) => Promise<BN>
   buyTickets: (numTix: number, account: string, callback: OnConfirmationHandler) => Promise<void>
   complete: (address: string, secret: string, callback: OnConfirmationHandler) => Promise<void>
-  entry: EntryInfo,
-  fee: BN
   getEntry: (account: string) => Promise<EntryInfo>
   getInfo: () => Promise<PoolInfo>
-  getNetWinnings: () => Promise<BN>
+  getNetWinnings: (address: string) => Promise<BN>
+  getOwner: () => Promise<string>
   getPastEvents: (type?: PoolEvent, options?: any) => Promise<EventData[]>
-  info: PoolInfo
   isOwner: (address: string) => Promise<boolean>
   lock: (address: string, secretHash: string, callback: OnConfirmationHandler) => Promise<void>
-  methodDocs: { [key: string]: { notice: string } | string }
-  netWinnings: BN
-  owner: string
   pastEvents: PastPoolEvents
-  playerBalance: BN
+  setPlayerAddress: (address: string) => Promise<any>
+  state: PoolContractState
   unlock: (address: string, callback: OnConfirmationHandler) => Promise<void>
   winnings: (account: string) => Promise<BN>
   withdraw: (account: string, callback: OnConfirmationHandler) => Promise<void>
 }
 
-const formatPurchases = (
+export const defaultPastPoolEvents: PastPoolEvents = {
+  [PoolEvent.BOUGHT_TICKETS]: [],
+  [PoolEvent.WITHDRAWN]: [],
+  [PoolEvent.POOL_LOCKED]: [],
+  [PoolEvent.POOL_UNLOCKED]: [],
+  [PoolEvent.POOL_COMPLETE]: [],
+  [PoolEvent.OWNERSHIP_TRANSFERRED]: [],
+}
+
+export const formatPurchases = (
   { address, event, returnValues: { count, totalPrice, sender }, transactionHash }: EventData,
   pastEvents: PastPoolEvents,
 ) => {
   const newEvent = {
     address,
+    buyer: sender,
     event,
     transactionHash: transactionHash,
   }
@@ -115,19 +142,20 @@ const formatPurchases = (
     tickets: toBn(count),
     total: toBn(totalPrice),
   }
-  const existingPurchase = pastEvents[PoolEvent.BOUGHT_TICKETS].find(
+  const existingPurchaser = pastEvents[PoolEvent.BOUGHT_TICKETS].find(
     pastEvent => sender === pastEvent.buyer,
   )
-  if (existingPurchase) {
-    existingPurchase.purchases.push({
+  if (existingPurchaser) {
+    if (existingPurchaser.address !== address) return
+    existingPurchaser.purchases.push({
       hash: transactionHash,
       ...ticketsAndTotal,
     })
-    existingPurchase.tickets = existingPurchase.purchases.reduce(
+    existingPurchaser.tickets = existingPurchaser.purchases.reduce(
       (prev, next) => prev.add(next.tickets),
       toBn(0),
     )
-    existingPurchase.total = existingPurchase.purchases.reduce(
+    existingPurchaser.total = existingPurchaser.purchases.reduce(
       (prev, next) => prev.add(next.total),
       toBn(0),
     )
@@ -140,15 +168,16 @@ const formatPurchases = (
           ...ticketsAndTotal,
         },
       ],
-      buyer: sender,
       ...ticketsAndTotal,
     })
   }
 }
 
-export const updatePastEvents = (evt: EventData, pastEvents: PastPoolEvents): PastPoolEvents => {
+export const updatePastEvents = (
+  evt: EventData,
+  pastEvents: PastPoolEvents,
+) => {
   const { event, returnValues, transactionHash } = evt
-  const _updated = { ...pastEvents }
   const newEvent = {
     address: evt.address,
     event,
@@ -156,7 +185,7 @@ export const updatePastEvents = (evt: EventData, pastEvents: PastPoolEvents): Pa
   }
   switch (event) {
     case PoolEvent.BOUGHT_TICKETS:
-      formatPurchases(evt, _updated)
+      formatPurchases(evt, pastEvents)
       break
     case PoolEvent.WITHDRAWN:
       pastEvents[event].push({
@@ -180,5 +209,7 @@ export const updatePastEvents = (evt: EventData, pastEvents: PastPoolEvents): Pa
     default:
       break
   }
-  return _updated
 }
+
+export const calculateWithdrawn = (withdrawals: Withdrawal[]): BN =>
+  withdrawals.reduce((prev, next) => prev.add(next.amount), toBn(0))
