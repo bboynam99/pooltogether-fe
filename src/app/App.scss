@@ -1,4 +1,4 @@
-@import "colors";
+@import "../styles/colors";
 
 .App {
   font-family: 'Source Code Pro', monospace;
@@ -66,18 +66,6 @@ li {
   grid-gap: 10px;
   grid-auto-rows: minmax(100px, auto);
 }
-
-.pool-grid-container {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  /*grid-gap: 10px;*/
-  grid-auto-rows: minmax(100px, auto);
-  padding-bottom: 20px;
-}
-
-/*h3, h4 {*/
-/*  margin: 0;*/
-/*}*/
 
 td {
   padding: 5px;

@@ -1,10 +1,9 @@
 import React from 'react'
 import { OnConfirmationHandler } from '../../contracts/contract.model'
-import { PoolInstance, PoolState } from '../../contracts/pool/pool.model'
+import { PoolInstance } from '../../contracts/pool/pool.model'
 
 interface PoolStateProps {
-  account: string
-  isOwner: boolean
+  playerAddress: string
   pool: PoolInstance
   secret: string
   secretHash: string
@@ -12,22 +11,21 @@ interface PoolStateProps {
 }
 
 export const PoolStateFns: React.FC<PoolStateProps> = ({
-  account,
+  playerAddress,
   pool,
   secret,
   secretHash,
   update,
 }: PoolStateProps) => {
-  const lock = () => pool.lock(account, secretHash, update)
-  const unlock = () => pool.unlock(account, update)
-  const complete = () => pool.complete(account, secret, update)
+  const { isLocked, isOpen, isUnlocked } = pool.state
+  const lock = () => pool.lock(playerAddress, secretHash, update)
+  const unlock = () => pool.unlock(playerAddress, update)
+  const complete = () => pool.complete(playerAddress, secret, update)
   return (
     <div>
-      {pool.state.info.poolState === PoolState.OPEN && <button onClick={lock}>Lock</button>}
-      {pool.state.info.poolState === PoolState.LOCKED && <button onClick={unlock}>Unlock</button>}
-      {pool.state.info.poolState === PoolState.UNLOCKED && (
-        <button onClick={complete}>Complete</button>
-      )}
+      {isOpen && <button onClick={lock}>Lock</button>}
+      {isLocked && <button onClick={unlock}>Unlock</button>}
+      {isUnlocked && <button onClick={complete}>Complete</button>}
     </div>
   )
 }

@@ -31,10 +31,15 @@ export interface PoolContractState {
   fee: BN
   grossWinnings: BN
   info: PoolInfo
+  isComplete: boolean
+  isLocked: boolean
+  isOpen: boolean
+  isUnlocked: boolean
   netWinnings: BN
   owner: string
   pastEvents: PastPoolEvents
   playerAddress: string
+  winner: string
 }
 
 export interface PurchaseDetail {
@@ -109,7 +114,9 @@ export interface PoolInstance {
   getNetWinnings: (address: string) => Promise<BN>
   getOwner: () => Promise<string>
   getPastEvents: (type?: PoolEvent, options?: any) => Promise<EventData[]>
-  isOwner: (address: string) => Promise<boolean>
+  getWinner: () => Promise<string>
+  isOwner: (address: string) => boolean
+  isWinner: (address: string) => boolean
   lock: (address: string, secretHash: string, callback: OnConfirmationHandler) => Promise<void>
   pastEvents: PastPoolEvents
   setPlayerAddress: (address: string) => Promise<any>

@@ -2,7 +2,12 @@ import BN from 'bn.js'
 import { pick } from 'lodash'
 import { EventData } from 'web3-eth-contract'
 import { getContract, toBn } from '../../web3'
-import { allEventsOptions, OnConfirmationHandler, tokenContract } from '../contract.model'
+import {
+  addressMatch,
+  allEventsOptions,
+  OnConfirmationHandler,
+  tokenContract,
+} from '../contract.model'
 import PoolContractJSON from './Pool.json'
 import {
   defaultPastPoolEvents,
@@ -11,6 +16,7 @@ import {
   PoolEvent,
   PoolInfo,
   PoolInstance,
+  PoolState,
   updatePastEvents,
 } from './pool.model'
 
@@ -28,14 +34,15 @@ export const PoolContract = async (
     feeAmount,
     getEntry,
     getInfo,
-    isOwner,
     lock,
     netWinnings,
     owner,
     unlock,
+    winnerAddress,
     winnings,
     withdraw,
   } = contract.methods
+  let pastEvents: PastPoolEvents = defaultPastPoolEvents
 
   const _balanceOf = async (address: string) => toBn(await balanceOf(address).call())
 
@@ -100,7 +107,7 @@ export const PoolContract = async (
   const _getPastEvents = (type: PoolEvent = PoolEvent.ALL, options: any = allEventsOptions) =>
     contract.getPastEvents(type, options)
 
-  const _isOwner = (address: string) => isOwner().call({ from: address })
+  const _getWinner = () => winnerAddress().call()
 
   const _lock = (address: string, secretHash: string, callback: OnConfirmationHandler) =>
     lock(secretHash)
@@ -124,7 +131,6 @@ export const PoolContract = async (
       .send({ from: account, value: 0 })
       .on('confirmation', callback)
 
-  let pastEvents: PastPoolEvents = defaultPastPoolEvents
   const state: PoolContractState = {
     allowance: toBn(0),
     balance: toBn(0),
@@ -132,11 +138,19 @@ export const PoolContract = async (
     fee: toBn(0),
     grossWinnings: toBn(0),
     info: await _getInfo(),
+    isComplete: false,
+    isLocked: false,
+    isOpen: true,
+    isUnlocked: false,
     netWinnings: toBn(0),
-    owner: await _getOwner(),
+    owner: await owner().call(),
     pastEvents: defaultPastPoolEvents,
     playerAddress,
+    winner: await _getWinner(),
   }
+  const _isOwner = (address: string): boolean => addressMatch(address, state.owner)
+
+  const _isWinner = (address: string): boolean => addressMatch(address, state.winner)
 
   const setPlayerAddress = async (address: string) => {
     state.playerAddress = address
@@ -147,14 +161,16 @@ export const PoolContract = async (
     state.grossWinnings = await _winnings(playerAddress)
     state.info = await _getInfo()
     state.netWinnings = await _getNetWinnings(playerAddress)
+    state.winner = await _getWinner()
+    state.isComplete = state.info.poolState === PoolState.COMPLETE
+    state.isLocked = state.info.poolState === PoolState.LOCKED
+    state.isOpen = state.info.poolState === PoolState.OPEN
+    state.isUnlocked = state.info.poolState === PoolState.UNLOCKED
   }
 
   contract.events
     .allEvents({ fromBlock: 0 })
-    .on(
-      'data',
-      async (event: EventData) => await updatePastEvents(event, state.pastEvents),
-    )
+    .on('data', async (event: EventData) => await updatePastEvents(event, state.pastEvents))
 
   return {
     address: contract.address,
@@ -166,7 +182,9 @@ export const PoolContract = async (
     getNetWinnings: _getNetWinnings,
     getOwner: _getOwner,
     getPastEvents: _getPastEvents,
+    getWinner: _getWinner,
     isOwner: _isOwner,
+    isWinner: _isWinner,
     lock: _lock,
     pastEvents,
     setPlayerAddress,

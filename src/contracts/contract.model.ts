@@ -14,3 +14,6 @@ export const allEventsOptions = {
 }
 export const blankAddress = '0x0000000000000000000000000000000000000000'
 export const tokenContract = TokenContract()
+
+export const addressMatch = (address1: string, address2: string): boolean =>
+  address1.toLowerCase() === address2.toLowerCase()

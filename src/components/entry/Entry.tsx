@@ -1,34 +1,25 @@
 import React, { ChangeEvent, useState } from 'react'
 import { PoolInstance } from '../../contracts/pool/pool.model'
 import { toBn } from '../../web3'
-import { blankAddress } from '../../contracts/contract.model'
+import { addressMatch, blankAddress, tokenContract } from '../../contracts/contract.model'
 import { WithdrawButton } from '../pool/WithdrawButton'
-import { TokenInstance } from '../../contracts/token/TokenContract'
 import { EntryStats } from './EntryStats'
 import { NoDice } from './NoDice'
 import { WinnerWinner } from './WinnerWinner'
 
 interface EntryProps {
   playerAddress: string
-  isComplete: boolean
-  isOpen: boolean
-  isWinner: boolean
   pool: PoolInstance
-  tokenContract: TokenInstance
   update: (confirmationNumber: number) => void
 }
 
 export const Entry: React.FC<EntryProps> = ({
   playerAddress,
-  isComplete,
-  isOpen,
-  isWinner,
   pool,
-  tokenContract,
   update,
 }: EntryProps) => {
   const [numTixToBuy, setNumTixToBuy] = useState(1)
-  const { allowance, balance, entry, grossWinnings, netWinnings } = pool.state
+  const { allowance, balance, entry, grossWinnings, isComplete, isOpen, netWinnings, winner } = pool.state
   const connect = () => tokenContract.approve(pool.address, playerAddress, update)
 
   const buy = async () => {
@@ -63,8 +54,8 @@ export const Entry: React.FC<EntryProps> = ({
               justifyContent: 'space-between',
             }}
           >
-            {isWinner && <WinnerWinner balance={balance} netWinnings={netWinnings} />}
-            {!isWinner && isComplete && <NoDice balance={balance} />}
+            {addressMatch(playerAddress, winner) && <WinnerWinner balance={balance} netWinnings={netWinnings} />}
+            {!addressMatch(playerAddress, winner) && isComplete && <NoDice balance={balance} />}
             <div className="actions">
               {allowance.lte(toBn(0)) && isOpen && (
                 <button onClick={connect}>Connect to Pool</button>

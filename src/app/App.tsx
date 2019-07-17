@@ -1,14 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { Header } from '../components/Header'
-import { Entry } from '../components/entry/Entry'
 import { Pool } from '../components/pool/Pool'
-import { PoolInstance, PoolEvent } from '../contracts/pool/pool.model'
-import { Purchases } from '../components/pool/Purchases'
-import { Withdrawals } from '../components/pool/Withdrawals'
 import { PoolManager } from '../components/poolManager/PoolManager'
 import { PreviousPools } from '../components/PreviousPools'
 import { enable, onAccountsChanged, removeAccountsChanged } from '../web3'
-import '../styles/App.scss'
+import './App.scss'
 import { getUpdatedAppState, IAppState } from './app.model'
 
 const loading = <div style={{ margin: 20 }}>Loading...</div>
@@ -26,8 +22,7 @@ const App: React.FC = () => {
 
   const update = (confirmationNum: number) => {
     if (confirmationNum > 1) return
-    if (accounts.length)
-      getUpdatedAppState(accounts, poolToView).then(setAppState)
+    if (accounts.length) getUpdatedAppState(accounts).then(setAppState)
   }
 
   const updateEffectHandler = () => {
@@ -39,35 +34,21 @@ const App: React.FC = () => {
 
   if (!appState) return loading
 
-  const {
-    isComplete,
-    // isLocked,
-    isOpen,
-    isPoolManager,
-    // isPoolOwner,
-    // isUnlocked,
-    isWinner,
-    // pool,
-    poolManagerInfo,
-    manager,
-    tokenContract,
-  } = appState
-
-  const pool = manager.state.pools[poolToView]
-  console.log('new pool')
+  const { poolManagerInfo, manager } = appState
+  const pool = manager.pools[poolToView]
 
   return (
     <div className="App">
-      {appState ? (
+      {pool ? (
         <div className="grid-container">
           <Header />
 
           <div className="menu">
-            {isPoolManager && (
+            {manager.state.isManager && (
               <PoolManager
                 accounts={accounts}
                 manager={manager}
-                currentPoolComplete={isComplete}
+                currentPoolComplete={pool.state.isComplete}
                 onConfirmation={update}
                 poolManagerInfo={poolManagerInfo}
               />
@@ -82,24 +63,7 @@ const App: React.FC = () => {
           </div>
 
           <div className="content">
-            <div
-              style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}
-            >
-              <Pool account={accounts[0]} pool={pool} update={update} />
-              <Entry
-                playerAddress={accounts[0]}
-                isComplete={isComplete}
-                isOpen={isOpen}
-                isWinner={isWinner}
-                pool={pool}
-                tokenContract={tokenContract}
-                update={update}
-              />
-            </div>
-
-            <hr />
-            <Purchases address={accounts[0]} pool={pool} />
-            <Withdrawals withdrawals={pool.state.pastEvents[PoolEvent.WITHDRAWN]} />
+            <Pool playerAddress={accounts[0]} pool={pool} update={update} />
           </div>
         </div>
       ) : (

@@ -1,5 +1,11 @@
 @import "../../styles/colors";
 
+.pool-grid {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
 .row {
   &:nth-of-type(even) {
     background-color: rgba(100, 100, 100, 0.05);
